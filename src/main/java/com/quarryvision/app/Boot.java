@@ -10,6 +10,8 @@ public class Boot extends Application {
 
     @Override
     public void start(Stage stage) {
+        Config cfg = Config.load();
+        System.out.println("Inbox dir: " + cfg.imp().inbox());
         MainController root = new MainController();
         stage.setTitle("QuarryVision - MVP");
         stage.setScene(new Scene(root.getRoot(), 900, 600));

@@ -1,0 +1,13 @@
+app:
+  name: QuarryVision
+db:
+  url: jdbc:postgresql://localhost:5432/quarry
+  user: quarry
+  pass: secret
+
+import:
+  inbox: "var/inbox"
+  patterns:
+    -"*.mp4"
+    -"*.mkv"
+    -"*.ts"
