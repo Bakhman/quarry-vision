@@ -1,0 +1,16 @@
+name: Java CI
+on:
+  push: { branches: ["main"] }
+  pull_request: { branches: ["main"] }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4           # 1) берет код из репо
+      - uses: actions/setup-java@v4         # 2) ставит JDK 17 (Temurin) и вкл. кеш maven
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+      - name: Build (no tests)
+        run: mvn -B -ntp -DskipTests clean package # 3) собирает JAR

@@ -1,5 +1,4 @@
 package com.quarryvision.app;
-:g:::
 
 import com.quarryvision.ui.MainController;
 import javafx.application.Application;

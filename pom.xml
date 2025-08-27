@@ -16,6 +16,18 @@
         <javafx.version>21.0.3</javafx.version>
     </properties>
 
+    <profiles>
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os><family>Windows</family></os>
+            </activation>
+            <properties>
+                <javafx.platform>win</javafx.platform>
+            </properties>
+        </profile>
+    </profiles>
+
     <dependencies>
         <!-- JavaFX -->
         <dependency>
@@ -34,7 +46,19 @@
             <version>${javafx.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
+        </dependency>
+
         <!-- Позже подключим: OpenCV/FFmpeg, ONNX Runtime, PostgreSQL, Hikari, SLF4J -->
+        <!-- https://mvnrepository.com/artifact/ch.qos.logback/logback-classic -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.6</version>
+        </dependency>
     </dependencies>
 
     <build>

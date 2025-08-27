@@ -11,12 +11,19 @@ public record Config(Db db, ImportConf imp) {
     public record Db(String url, String user, String pass) {}
     public record ImportConf(List<String> patterns, String inbox) {}
 
+    @SuppressWarnings("unchecked")
     public static Config load() {
-        try (InputStream in = Config.class.getResourceAsStream("/application.yaml")) {
-            Map<?, ?> m = new Yaml().load(in);
-            Map<?, ?> db = (Map<?, ?>)((Map<?, ?>)m.get("db"));
-            Map<?, ?> imp = (Map<?, ?>)((Map<?, ?>)m.get("import"));
-            return new Config(
+        try(InputStream in = Config.class.getResourceAsStream("/application.yaml")) {
+            if (in == null) {
+                throw new IllegalStateException("application.yaml not found on classpath");
+            }
+            Yaml yaml = new Yaml();
+            Map<String, Object> root = yaml.load(in);
+
+            Map<String, Object> db = (Map<String, Object>) root.get("db");
+            Map<String, Object> imp = (Map<String, Object>) root.get("import");
+
+            return  new Config(
                     new Db((String) db.get("url"), (String) db.get("user"), (String) db.get("pass")),
                     new ImportConf((List<String>) imp.get("patterns"), (String) imp.get("inbox"))
             );
