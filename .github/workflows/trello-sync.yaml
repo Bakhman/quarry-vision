@@ -1,0 +1,48 @@
+name: Trello Sync
+on:
+  schedule: [{ cron: "*/30 * * * *" }]   # каждые 30 минут
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Trello JSON
+        env:
+          KEY:   ${{ secrets.TRELLO_KEY }}
+          TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          BOARD: ${{ secrets.TRELLO_BOARD_ID }}
+        run: |
+          curl -sS -L "https://api.trello.com/1/boards/$BOARD?fields=name,dateLastActivity&lists=open&cards=open&card_fields=name,desc,idList,shortUrl,dateLastActivity&checklists=all&key=$KEY&token=$TOKEN" -o trello_board.json
+
+      - name: Generate TRELLO.md
+        run: |
+          python3 - << 'PY'
+          import json, pathlib
+          j=json.load(open("trello_board.json","r",encoding="utf-8"))
+          lists={lst["id"]:lst["name"] for lst in j.get("lists",[])}
+          lines=["# Trello Snapshot",
+                 f"**Board:** {j.get('name','?')}",
+                 f"**Updated:** {j.get('dateLastActivity','?')}",
+                 ""]
+          cards=j.get("cards",[])
+          bylist={}
+          for c in cards:
+            bylist.setdefault(c["idList"],[]).append(c)
+          for lid, items in bylist.items():
+            lines+=["", f"## {lists.get(lid,'List')}", ""]
+            for c in sorted(items, key=lambda x:x.get("dateLastActivity","")):
+              lines.append(f"- [{c['name']}]({c['shortUrl']})  \u2014 _updated {c.get('dateLastActivity','')}_" )
+          pathlib.Path("TRELLO.md").write_text("\n".join(lines),encoding="utf-8")
+          PY
+
+      - name: Commit snapshot
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: trello snapshot"
+          file_pattern: |
+            trello_board.json
+            TRELLO.md
+
