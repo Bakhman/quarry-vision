@@ -3,7 +3,7 @@ name: Trello Sync
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "*/30 * * * *" # каждые 30 минут
+    - cron: "0 5 * * * *" # 08:00 по UTC+3
 
 permissions:
   contents: write
