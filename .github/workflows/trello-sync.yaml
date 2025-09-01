@@ -1,6 +1,9 @@
 name: Trello Sync
+
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "*/30 * * * *" # каждые 30 минут
 
 permissions:
   contents: write
@@ -12,15 +15,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ... ваши шаги, которые генерят TRELLO.md / trello_board.json ...
+      - name: Fetch Trello JSON
+        env:
+          KEY:    ${{ secrets.TRELLO_KEY }}
+          TOKEN:  ${{ secrets.TRELLO_TOKEN }}
+          BOARD:  ${{ secrets.TRELLO_BOARD_ID }}
+        run: |
+          curl -sS -L \
+            "https://api.trello.com/1/boards/${BOARD}?fields=name,dateLastActivity&lists=open&cards=open&card_fields=name,dateLastActivity,list" \
+            -G --data-urlencode "key=${KEY}" --data-urlencode "token=${TOKEN}" \
+            -o trello_board.json
 
+      - name: Generate TRELLO.md
+        run: |
+          python3 - << 'PY'
+          import json, pathlib
+          j = json.load(open("trello_board.json","r",encoding="utf-8"))
+          lists = {l["id"]: l["name"] for l in j.get("lists", [])}
+          lines = [
+            "# Trello Snapshot",
+            f"**Board:** {j.get('name','?')}",
+            f"**Updated:** {j.get('dateLastActivity','?')}",
+            ""
+          ]
+          bylist = {}
+          for c in j.get("cards", []):
+            bylist.setdefault(c.get("idList"), []).append(c)
+          for lid, cards in sorted(bylist.items(), key=lambda kv: lists.get(kv[0],'').lower()):
+            lines.append(f"## {lists.get(lid,'List')}")
+            for c in sorted(cards, key=lambda c: c.get('dateLastActivity','')):
+              lines.append(f"- [{c.get('name','')}]  \u2014 _updated {c.get('dateLastActivity','')}_")
+            lines.append("")
+          pathlib.Path("TRELLO.md").write_text("\n".join(lines), encoding="utf-8")
+          PY
+
+      # вместо автокоммита — создаём PR с изменениями
       - name: Create PR with snapshot
         uses: peter-evans/create-pull-request@v6
         with:
           title: "chore: trello snapshot"
           body: "Автоснимок доски Trello"
           commit-message: "chore: trello snapshot"
-          branch: chore/trello-snapshot
+          branch: chore/trello-sync-snapshot
           add-paths: |
             TRELLO.md
             trello_board.json
