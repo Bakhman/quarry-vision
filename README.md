@@ -1,3 +1,14 @@
+<p align="left">
+  <!-- Java CI -->
+  <a href="https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yaml">
+    <img src="https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yaml/badge.svg?branch=main" alt="Java CI Status" />
+  </a>
+  <!-- Trello Sync -->
+  <a href="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml">
+    <img src="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml/badge.svg?branch=main" alt="Trello Sync" />
+  </a>
+</p>
+
 # quarry-vision
 
 Счётчик ковшей/рейсов для карьера + трекинг погрузки/разгрузки. Java 17, JavaFX, Maven, SnakeYAML, PostgreSQL.
