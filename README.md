@@ -13,10 +13,6 @@
 
 Счётчик ковшей/рейсов для карьера + трекинг погрузки/разгрузки. Java 17, JavaFX, Maven, SnakeYAML, PostgreSQL.
 
-[![Trello Sync](https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml/badge.svg?branch=main)](https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml)
-
-![Build](https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yaml/badge.svg)
-
 ## Требования
 - JDK 17 (Temurin)
 - Maven 3.9+
