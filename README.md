@@ -1,8 +1,17 @@
+<p align="left">
+  <!-- Java CI -->
+  <a href="https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yaml">
+    <img src="https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yaml/badge.svg?branch=main" alt="Java CI Status" />
+  </a>
+  <!-- Trello Sync -->
+  <a href="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml">
+    <img src="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml/badge.svg?branch=main" alt="Trello Sync" />
+  </a>
+</p>
+
 # quarry-vision
 
 Счётчик ковшей/рейсов для карьера + трекинг погрузки/разгрузки. Java 17, JavaFX, Maven, SnakeYAML, PostgreSQL.
-
-![Build](https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yml/badge.svg)
 
 ## Требования
 - JDK 17 (Temurin)
@@ -11,7 +20,7 @@
 
 ## Запуск
 ### Через Maven (рекомендовано)
-```bash
+
 mvn javafx:run
 
 Нужно ПО, которое с двух камер(установленных в кабинах экскаваторов, которые
@@ -85,3 +94,6 @@ src/main/resources/
   ├─ application.yaml
   └─ logback.xml
 
+## Chat Handbook
+
+Для удобной работы с проектом см. [Chat Handbook](docs/chat-handbook.md).
