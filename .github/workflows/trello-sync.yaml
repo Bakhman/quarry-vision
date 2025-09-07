@@ -61,3 +61,4 @@ jobs:
             TRELLO.md
             trello_board.json
           delete-branch: true
+          labels: auto-merge
