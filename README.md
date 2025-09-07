@@ -15,7 +15,7 @@
 
 [![Trello Sync](https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml/badge.svg?branch=main)](https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml)
 
-![Build](https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yml/badge.svg)
+![Build](https://github.com/Bakhman/quarry-vision/actions/workflows/ci.yaml/badge.svg)
 
 ## Требования
 - JDK 17 (Temurin)
