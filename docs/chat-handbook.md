@@ -43,3 +43,7 @@
 
 📌 Резюме:
 - Архитектура проекта определена (модули core, ingest, detection, ocr, persistence, ui, config).
+
+### 🔍 PR Checklist
+Для пошаговой проверки PR см. [`docs/pr-checklist.md`](./pr-checklist.md)
+
