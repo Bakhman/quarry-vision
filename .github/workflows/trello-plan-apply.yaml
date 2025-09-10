@@ -1,0 +1,68 @@
+name: Trello Plan Apply
+
+on:
+  workflow_dispatch: {}  # запуск вручную из Actions
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply docs/trello-plan.md to Trello
+        env:
+          TRELLO_KEY:    ${{ secrets.TRELLO_KEY }}
+          TRELLO_TOKEN:  ${{ secrets.TRELLO_TOKEN }}
+          TRELLO_BOARD:  ${{ secrets.TRELLO_BOARD_ID }}
+        run: |
+          set -euo pipefail
+
+          # 1) Архивируем все открытые списки (мягкая "перезапись")
+          curl -sS -X GET "https://api.trello.com/1/boards/$TRELLO_BOARD/lists?cards=none&filter=open&key=$TRELLO_KEY&token=$TRELLO_TOKEN" \
+          | jq -r '.[].id' \
+          | xargs -I{} curl -sS -X PUT "https://api.trello.com/1/lists/{}/closed?value=true&key=$TRELLO_KEY&token=$TRELLO_TOKEN" >/dev/null
+
+          # 2) Простейший парсер markdown-плана:
+          #    Заголовки второго уровня (##) = списки, строки со " - " = карточки.
+          python3 - << 'PY'
+          import os, re, requests, sys
+          board = os.environ["TRELLO_BOARD"]
+          key   = os.environ["TRELLO_KEY"]
+          token = os.environ["TRELLO_TOKEN"]
+
+          path = "docs/trello-plan.md"
+          txt  = open(path, "r", encoding="utf-8").read()
+
+          # Находим блоки вида "## <list title>" и пункты "- <card>"
+          blocks = []
+          cur = None
+          for line in txt.splitlines():
+            m = re.match(r'^\s*##\s+(.+?)\s*$', line)
+            if m:
+              if cur: blocks.append(cur)
+              cur = {"list": m.group(1).strip(), "cards": []}
+              continue
+            m = re.match(r'^\s*-\s+(.+?)\s*$', line)
+            if m and cur:
+              cur["cards"].append(m.group(1).strip())
+          if cur: blocks.append(cur)
+
+          # Создаём списки и карточки
+          s = requests.Session()
+          base = "https://api.trello.com/1"
+          auth = {"key": key, "token": token}
+
+          for b in blocks:
+            # POST /lists
+            r = s.post(f"{base}/lists", params={**auth, "name": b["list"], "idBoard": board, "pos": "bottom"})
+            r.raise_for_status()
+            id_list = r.json()["id"]
+            for title in b["cards"]:
+              # POST /cards
+              r2 = s.post(f"{base}/cards", params={**auth, "idList": id_list, "name": title})
+              r2.raise_for_status()
+          print(f"Applied {len(blocks)} lists from {path}")
+          PY
