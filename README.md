@@ -97,3 +97,5 @@ src/main/resources/
 ## Chat Handbook
 
 Для удобной работы с проектом см. [Chat Handbook](docs/chat-handbook.md).
+
+Быстрый самотест (2 мин)
