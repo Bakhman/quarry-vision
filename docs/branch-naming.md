@@ -4,7 +4,7 @@
 
 ## 📌 Формат
 
-<type>/<short-description>
+### ` - <type>/<short-description>`
 
 
 - `<type>` — совпадает с Conventional Commits.
