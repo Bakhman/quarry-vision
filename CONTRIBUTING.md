@@ -79,7 +79,10 @@
 * `fix: исправить падение при пустом application.yaml`
 * `chore: обновить зависимости`
 * `docs: поправить README`
+* `ci: изменения в GitHub Actions, CI/CD`
 * `test: добавить unit-тесты для Config`
+
+📂 См. также: [Branch Naming Guide](./docs/branch-naming.md)
 
 ---
 
