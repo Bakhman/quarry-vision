@@ -50,8 +50,16 @@
    git checkout main && git pull
    git branch -d <branch>
    ```
-
-   и удали ветку на GitHub.
+   
+8. и удали ветку на GitHub:
+    ```sh
+   git push origin --delete <branch_name>
+   ```
+    Alternative (shorter) syntax:\
+    You can also use a shorter syntax for deleting remote branches:
+    ```sh
+    git push origin :<branch_name>
+    ```
 
 ---
 
