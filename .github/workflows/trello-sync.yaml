@@ -3,17 +3,25 @@ name: Trello Sync
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "0 5 * * * " # каждый день в 05:00 UTC (08:00 по МСК)
+    - cron: "0 5 * * *" # каждый день в 05:00 UTC (08:00 по МСК)
 
 permissions:
   contents: write
   pull-requests: write
 
+#jobs:
+#  fetch:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0         # <-- важно
 
       - name: Fetch Trello JSON
         env:
@@ -50,15 +58,25 @@ jobs:
           PY
 
       # вместо автокоммита — создаём PR с изменениями
+      #- name: Create PR with snapshot
+      #  uses: peter-evans/create-pull-request@v6
+      #  with:
+      #    title: "chore: trello snapshot"
+      #    body: "Автоснимок доски Trello"
+      #    commit-message: "chore: trello snapshot"
+      #    branch: chore/trello-sync-snapshot
+      #    add-paths: |
+      #      TRELLO.md
+      #      trello_board.json
+      #    delete-branch: true
+      #    labels: auto-merge
       - name: Create PR with snapshot
         uses: peter-evans/create-pull-request@v6
         with:
-          title: "chore: trello snapshot"
-          body: "Автоснимок доски Trello"
-          commit-message: "chore: trello snapshot"
           branch: chore/trello-sync-snapshot
-          add-paths: |
-            TRELLO.md
-            trello_board.json
-          delete-branch: true
+          base: main
+          title: 'chore: trello snapshot'
+          commit-message: 'chore: trello snapshot'
           labels: auto-merge
+          update-branch: true    # <-- ключ к авто-обновлению ветки от main
+          delete-branch: false
