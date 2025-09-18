@@ -45,9 +45,9 @@ logs/
 *.log
 dependency-reduced-pom.xml
 
-# Локальные файлы (не коммитим)
+### Локальные файлы (не коммитим) ###
 project-structure.txt
 .chat-start-blocks.md
 
-# Separate directory for training files and cheat sheets
+### Separate directory for training files and cheat sheets ###
 /practice/
