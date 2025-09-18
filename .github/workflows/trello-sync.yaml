@@ -9,11 +9,6 @@ permissions:
   contents: write
   pull-requests: write
 
-#jobs:
-#  fetch:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -57,19 +52,6 @@ jobs:
           pathlib.Path("TRELLO.md").write_text("\n".join(lines), encoding="utf-8")
           PY
 
-      # вместо автокоммита — создаём PR с изменениями
-      #- name: Create PR with snapshot
-      #  uses: peter-evans/create-pull-request@v6
-      #  with:
-      #    title: "chore: trello snapshot"
-      #    body: "Автоснимок доски Trello"
-      #    commit-message: "chore: trello snapshot"
-      #    branch: chore/trello-sync-snapshot
-      #    add-paths: |
-      #      TRELLO.md
-      #      trello_board.json
-      #    delete-branch: true
-      #    labels: auto-merge
       - name: Create PR with snapshot
         uses: peter-evans/create-pull-request@v6
         with:
