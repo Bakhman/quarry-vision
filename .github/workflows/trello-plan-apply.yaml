@@ -1,7 +1,13 @@
 name: Trello Plan Apply
 
 on:
-  workflow_dispatch: {}  # запуск вручную из Actions
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply changes to Trello (archive lists and recreate from docs/trello-plan.md)"
+        type: boolean
+        required: true
+        default: false  # безопасный дефолт
 
 permissions:
   contents: read
@@ -18,6 +24,7 @@ jobs:
           TRELLO_TOKEN:  ${{ secrets.TRELLO_TOKEN }}
           TRELLO_BOARD:  ${{ secrets.TRELLO_BOARD_ID }}
         run: |
+          if [ "${{ inputs.apply }}" != "true" ]; then echo "apply=false → no-op"; exit 0; fi
           set -euo pipefail
 
           # 1) Архивируем все открытые списки (мягкая "перезапись")
