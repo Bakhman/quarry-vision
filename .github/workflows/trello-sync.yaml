@@ -1,7 +1,13 @@
 name: Trello Sync
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Create PR with snapshot (otherwise dry-run)"
+        type: boolean
+        required: false
+        default: false
   schedule:
     - cron: "0 5 * * *" # каждый день в 05:00 UTC (08:00 по МСК)
 
@@ -53,6 +59,7 @@ jobs:
           PY
 
       - name: Create PR with snapshot
+        if: ${{ inputs.commit == true }}
         uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/trello-sync-snapshot
