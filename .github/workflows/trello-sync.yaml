@@ -60,5 +60,4 @@ jobs:
           title: 'chore: trello snapshot'
           commit-message: 'chore: trello snapshot'
           labels: auto-merge
-          update-branch: true    # <-- ключ к авто-обновлению ветки от main
           delete-branch: false
