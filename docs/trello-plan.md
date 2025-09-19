@@ -1,13 +1,10 @@
-# Trello Plan
+# План Trello (источник истины для apply)
 
 ## 📥 Inbox
 - [ ] Идеи/заметки сюда
 
 ## 📋 Backlog
-- [ ] CI Badge/README финализировать
-- [ ] Ruleset: запрет push, required check `build`
 - [ ] Auto-merge (squash) проверить на тех-PR
-- [ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`
 - [ ] Ingest (USB) — базовый поток
 - [ ] Detection (подсчёт ковшей) — заглушка + интерфейс
 - [ ] OCR (Tess4J) — smoke-тест
@@ -15,9 +12,10 @@
 - [ ] UI (JavaFX) — старт/стоп + лог
 - [ ] E2E связка + краткое демо (GIF/скрин)
 
-
 ## 🚧 In Progress
-- [ ] cleanup-guide.md + зачистка старых веток
+- [ ] CI Badge/README финализировать
+- [ ] Ruleset: запрет push, required check `build`
+- [ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`
 
 ## 🔍 Review
 - [ ] PR-templates / Issue-templates просмотреть
@@ -25,6 +23,7 @@
 ## ✅ Done
 - [ ] Ruleset OK
 - [ ] Auto-merge OK
+- [ ] cleanup-guide.md + зачистка старых веток
 
 ## 🧰 Tech/CI
 - [ ] `.gitignore`: исключить IDE/`target/`
@@ -33,3 +32,4 @@
 
 ## 🗺 Epics
 - [ ] Ingest → Detection → OCR → Persist → UI (end-to-end)
+
