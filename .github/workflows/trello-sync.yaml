@@ -67,4 +67,5 @@ jobs:
           title: 'chore: trello snapshot'
           commit-message: 'chore: trello snapshot'
           labels: auto-merge
-          delete-branch: false
+          delete-branch: true
+          token: ${{ secrets.GH_PAT_WORKFLOWS }}
