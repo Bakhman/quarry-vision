@@ -58,6 +58,11 @@ jobs:
           pathlib.Path("TRELLO.md").write_text("\n".join(lines), encoding="utf-8")
           PY
 
+      - name: Heartbeat to force diff
+        run: |
+            mkdir -p .trello-sync
+            date -u +"%Y-%m-%dT%H:%M:%SZ run=${GITHUB_RUN_NUMBER} id=${GITHUB_RUN_ID}" > .trello-sync/last-run.txt
+
       - name: Create PR with snapshot
         if: ${{ inputs.commit == true }}
         uses: peter-evans/create-pull-request@v6
