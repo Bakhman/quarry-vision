@@ -7,6 +7,10 @@
   <a href="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml">
     <img src="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-sync.yaml/badge.svg?branch=main" alt="Trello Sync" />
   </a>
+  <!-- Trello Plan Apply -->
+  <a href="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-plan-apply.yaml">
+    <img src="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-plan-apply.yaml/badge.svg?branch=main" alt="Trello Plan Apply" />
+  </a>
 </p>
 
 # quarry-vision
