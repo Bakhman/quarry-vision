@@ -4,7 +4,6 @@
 - [ ] Идеи/заметки сюда
 
 ## 📋 Backlog
-- [ ] Auto-merge (squash) проверить на тех-PR
 - [ ] Ingest (USB) — базовый поток
 - [ ] Detection (подсчёт ковшей) — заглушка + интерфейс
 - [ ] OCR (Tess4J) — smoke-тест
@@ -13,9 +12,7 @@
 - [ ] E2E связка + краткое демо (GIF/скрин)
 
 ## 🚧 In Progress
-- [ ] CI Badge/README финализировать
-- [ ] Ruleset: запрет push, required check `build`
-- [ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`
+- [ ] Auto-merge (squash) проверить на тех-PR
 
 ## 🔍 Review
 - [ ] PR-templates / Issue-templates просмотреть
@@ -24,6 +21,9 @@
 - [ ] Ruleset OK
 - [ ] Auto-merge OK
 - [ ] cleanup-guide.md + зачистка старых веток
+- [ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`
+- [ ] Ruleset: запрет push, required check `build`
+- [ ] CI Badge/README финализировать
 
 ## 🧰 Tech/CI
 - [ ] `.gitignore`: исключить IDE/`target/`
