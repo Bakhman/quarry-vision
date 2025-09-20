@@ -11,6 +11,14 @@
   <a href="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-plan-apply.yaml">
     <img src="https://github.com/Bakhman/quarry-vision/actions/workflows/trello-plan-apply.yaml/badge.svg?branch=main" alt="Trello Plan Apply" />
   </a>
+	<!-- Last commit -->
+  <a href="https://github.com/Bakhman/quarry-vision/commits/main">
+    <img src="https://img.shields.io/github/last-commit/Bakhman/quarry-vision/main.svg" alt="Last commit" />
+  </a>
+  <!-- License -->
+  <a href="https://github.com/Bakhman/quarry-vision/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/Bakhman/quarry-vision.svg" alt="License" />
+  </a>
 </p>
 
 # quarry-vision
