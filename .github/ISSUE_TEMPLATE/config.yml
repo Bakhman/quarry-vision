@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Общие вопросы
-    url: https://github.com/Bakhman/quarry-vision/discussions
-    about: Задай вопрос или обсуди идею в разделе Discussions
 
   - name: ❓ Вопрос по использованию
     url: https://github.com/Bakhman/quarry-vision/discussions/categories/help
