@@ -1,6 +1,6 @@
 # Trello Snapshot
 **Board:** QuarryVision — учёт ковшей и рейсов
-**Updated:** 2025-09-22T06:33:09.506Z
+**Updated:** 2025-09-22T08:27:21.103Z
 
 ## List
 - [Эпик 2. Импорт и хранение видео]  — _updated 2025-08-17T10:03:27.304Z_
@@ -158,5 +158,62 @@
 - [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-22T06:19:46.441Z_
 - [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-22T06:20:45.115Z_
 - [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T06:20:46.836Z_
-- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T06:33:07.510Z_
-- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T06:33:09.506Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T08:05:26.032Z_
+- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T08:05:27.406Z_
+- [[ ] Идеи/заметки сюда]  — _updated 2025-09-22T08:06:14.723Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T08:06:15.284Z_
+- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T08:06:15.745Z_
+- [[ ] OCR (Tess4J) — smoke-тест]  — _updated 2025-09-22T08:06:16.059Z_
+- [[ ] Persistence (Postgres) — миграции + запись]  — _updated 2025-09-22T08:06:16.376Z_
+- [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-09-22T08:06:16.695Z_
+- [[ ] E2E связка + краткое демо (GIF/скрин)]  — _updated 2025-09-22T08:06:17.003Z_
+- [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-22T08:06:17.537Z_
+- [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T08:06:18.100Z_
+- [[ ] Ruleset OK]  — _updated 2025-09-22T08:06:18.674Z_
+- [[ ] Auto-merge OK]  — _updated 2025-09-22T08:06:18.987Z_
+- [[ ] cleanup-guide.md + зачистка старых веток]  — _updated 2025-09-22T08:06:19.304Z_
+- [[ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`]  — _updated 2025-09-22T08:06:19.631Z_
+- [[ ] Ruleset: запрет push, required check `build`]  — _updated 2025-09-22T08:06:19.945Z_
+- [[ ] CI Badge/README финализировать]  — _updated 2025-09-22T08:06:20.322Z_
+- [[ ] `.gitignore`: исключить IDE/`target/`]  — _updated 2025-09-22T08:06:20.963Z_
+- [[ ] build (pull_request) зелёный]  — _updated 2025-09-22T08:06:21.358Z_
+- [[ ] Trello Plan Apply/Sync расписание/права]  — _updated 2025-09-22T08:06:21.761Z_
+- [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-22T08:06:22.309Z_
+- [[ ] Идеи/заметки сюда]  — _updated 2025-09-22T08:10:00.130Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T08:10:00.612Z_
+- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T08:10:00.868Z_
+- [[ ] OCR (Tess4J) — smoke-тест]  — _updated 2025-09-22T08:10:01.126Z_
+- [[ ] Persistence (Postgres) — миграции + запись]  — _updated 2025-09-22T08:10:01.429Z_
+- [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-09-22T08:10:01.698Z_
+- [[ ] E2E связка + краткое демо (GIF/скрин)]  — _updated 2025-09-22T08:10:01.973Z_
+- [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-22T08:10:02.479Z_
+- [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T08:10:02.979Z_
+- [[ ] Ruleset OK]  — _updated 2025-09-22T08:10:03.439Z_
+- [[ ] Auto-merge OK]  — _updated 2025-09-22T08:10:03.713Z_
+- [[ ] cleanup-guide.md + зачистка старых веток]  — _updated 2025-09-22T08:10:04.188Z_
+- [[ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`]  — _updated 2025-09-22T08:10:04.497Z_
+- [[ ] Ruleset: запрет push, required check `build`]  — _updated 2025-09-22T08:10:04.782Z_
+- [[ ] CI Badge/README финализировать]  — _updated 2025-09-22T08:10:05.272Z_
+- [[ ] `.gitignore`: исключить IDE/`target/`]  — _updated 2025-09-22T08:10:05.944Z_
+- [[ ] build (pull_request) зелёный]  — _updated 2025-09-22T08:10:06.207Z_
+- [[ ] Trello Plan Apply/Sync расписание/права]  — _updated 2025-09-22T08:10:06.478Z_
+- [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-22T08:10:06.905Z_
+- [[ ] Идеи/заметки сюда]  — _updated 2025-09-22T08:27:14.291Z_
+- [[ ] OCR (Tess4J) — smoke-тест]  — _updated 2025-09-22T08:27:14.807Z_
+- [[ ] Persistence (Postgres) — миграции + запись]  — _updated 2025-09-22T08:27:15.142Z_
+- [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-09-22T08:27:15.414Z_
+- [[ ] E2E связка + краткое демо (GIF/скрин)]  — _updated 2025-09-22T08:27:15.761Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T08:27:16.291Z_
+- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T08:27:16.625Z_
+- [[ ] Ruleset OK]  — _updated 2025-09-22T08:27:17.443Z_
+- [[ ] Auto-merge OK]  — _updated 2025-09-22T08:27:17.750Z_
+- [[ ] cleanup-guide.md + зачистка старых веток]  — _updated 2025-09-22T08:27:18.048Z_
+- [[ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`]  — _updated 2025-09-22T08:27:18.366Z_
+- [[ ] Ruleset: запрет push, required check `build`]  — _updated 2025-09-22T08:27:18.638Z_
+- [[ ] CI Badge/README финализировать]  — _updated 2025-09-22T08:27:18.949Z_
+- [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-22T08:27:19.281Z_
+- [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T08:27:19.556Z_
+- [[ ] `.gitignore`: исключить IDE/`target/`]  — _updated 2025-09-22T08:27:20.016Z_
+- [[ ] build (pull_request) зелёный]  — _updated 2025-09-22T08:27:20.291Z_
+- [[ ] Trello Plan Apply/Sync расписание/права]  — _updated 2025-09-22T08:27:20.618Z_
+- [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-22T08:27:21.103Z_
