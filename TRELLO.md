@@ -1,6 +1,6 @@
 # Trello Snapshot
 **Board:** QuarryVision — учёт ковшей и рейсов
-**Updated:** 2025-09-20T07:16:02.243Z
+**Updated:** 2025-09-22T06:00:34.775Z
 
 ## List
 - [Эпик 2. Импорт и хранение видео]  — _updated 2025-08-17T10:03:27.304Z_
@@ -123,14 +123,11 @@
 - [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-09-20T07:14:50.830Z_
 - [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-20T07:14:52.019Z_
 - [[ ] Идеи/заметки сюда]  — _updated 2025-09-20T07:15:55.020Z_
-- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-20T07:15:55.546Z_
 - [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-20T07:15:55.841Z_
 - [[ ] OCR (Tess4J) — smoke-тест]  — _updated 2025-09-20T07:15:56.215Z_
 - [[ ] Persistence (Postgres) — миграции + запись]  — _updated 2025-09-20T07:15:56.539Z_
 - [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-09-20T07:15:56.837Z_
 - [[ ] E2E связка + краткое демо (GIF/скрин)]  — _updated 2025-09-20T07:15:57.208Z_
-- [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-20T07:15:57.862Z_
-- [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-20T07:15:58.398Z_
 - [[ ] Ruleset OK]  — _updated 2025-09-20T07:15:58.923Z_
 - [[ ] Auto-merge OK]  — _updated 2025-09-20T07:15:59.217Z_
 - [[ ] cleanup-guide.md + зачистка старых веток]  — _updated 2025-09-20T07:15:59.537Z_
@@ -141,3 +138,6 @@
 - [[ ] build (pull_request) зелёный]  — _updated 2025-09-20T07:16:01.380Z_
 - [[ ] Trello Plan Apply/Sync расписание/права]  — _updated 2025-09-20T07:16:01.700Z_
 - [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-20T07:16:02.243Z_
+- [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-21T00:58:10.609Z_
+- [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T05:59:52.454Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T06:00:34.775Z_
