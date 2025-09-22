@@ -4,18 +4,17 @@
 - [ ] Идеи/заметки сюда
 
 ## 📋 Backlog
-- [ ] Ingest (USB) — базовый поток
-- [ ] Detection (подсчёт ковшей) — заглушка + интерфейс
 - [ ] OCR (Tess4J) — smoke-тест
 - [ ] Persistence (Postgres) — миграции + запись
 - [ ] UI (JavaFX) — старт/стоп + лог
 - [ ] E2E связка + краткое демо (GIF/скрин)
 
 ## 🚧 In Progress
-- [ ] Auto-merge (squash) проверить на тех-PR
+- [ ] Ingest (USB) — базовый поток
+- [ ] Detection (подсчёт ковшей) — заглушка + интерфейс
 
 ## 🔍 Review
-- [ ] PR-templates / Issue-templates просмотреть
+
 
 ## ✅ Done
 - [ ] Ruleset OK
@@ -24,6 +23,8 @@
 - [ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`
 - [ ] Ruleset: запрет push, required check `build`
 - [ ] CI Badge/README финализировать
+- [ ] Auto-merge (squash) проверить на тех-PR
+- [ ] PR-templates / Issue-templates просмотреть
 
 ## 🧰 Tech/CI
 - [ ] `.gitignore`: исключить IDE/`target/`
