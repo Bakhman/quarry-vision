@@ -9,7 +9,7 @@ import java.util.Map;
 
 public record Config(Db db, ImportConf imp) {
     public record Db(String url, String user, String pass) {}
-    public record ImportConf(List<String> patterns, String inbox) {}
+    public record ImportConf(List<String> patterns, String inbox, String source) {}
 
     @SuppressWarnings("unchecked")
     public static Config load() {
@@ -25,7 +25,7 @@ public record Config(Db db, ImportConf imp) {
 
             return  new Config(
                     new Db((String) db.get("url"), (String) db.get("user"), (String) db.get("pass")),
-                    new ImportConf((List<String>) imp.get("patterns"), (String) imp.get("inbox"))
+                    new ImportConf((List<String>) imp.get("patterns"), (String) imp.get("inbox"), (String) imp.get("source"))
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to load application.yaml", e);

@@ -6,7 +6,8 @@ db:
   pass: secret
 
 import:
-  inbox: E:/inbox
+  inbox: E:/INBOX
+  source: F:/USB
   patterns:
     - "*.mp4"
     - "*.mkv"
