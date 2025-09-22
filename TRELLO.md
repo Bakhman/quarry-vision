@@ -1,6 +1,6 @@
 # Trello Snapshot
 **Board:** QuarryVision — учёт ковшей и рейсов
-**Updated:** 2025-09-22T06:00:34.775Z
+**Updated:** 2025-09-22T06:20:46.836Z
 
 ## List
 - [Эпик 2. Импорт и хранение видео]  — _updated 2025-08-17T10:03:27.304Z_
@@ -141,3 +141,22 @@
 - [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-21T00:58:10.609Z_
 - [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T05:59:52.454Z_
 - [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T06:00:34.775Z_
+- [[ ] Идеи/заметки сюда]  — _updated 2025-09-22T06:19:39.007Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T06:19:39.580Z_
+- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T06:19:39.943Z_
+- [[ ] OCR (Tess4J) — smoke-тест]  — _updated 2025-09-22T06:19:40.260Z_
+- [[ ] Persistence (Postgres) — миграции + запись]  — _updated 2025-09-22T06:19:40.637Z_
+- [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-09-22T06:19:40.924Z_
+- [[ ] E2E связка + краткое демо (GIF/скрин)]  — _updated 2025-09-22T06:19:41.268Z_
+- [[ ] Ruleset OK]  — _updated 2025-09-22T06:19:42.942Z_
+- [[ ] Auto-merge OK]  — _updated 2025-09-22T06:19:43.277Z_
+- [[ ] cleanup-guide.md + зачистка старых веток]  — _updated 2025-09-22T06:19:43.561Z_
+- [[ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`]  — _updated 2025-09-22T06:19:43.888Z_
+- [[ ] Ruleset: запрет push, required check `build`]  — _updated 2025-09-22T06:19:44.204Z_
+- [[ ] CI Badge/README финализировать]  — _updated 2025-09-22T06:19:44.504Z_
+- [[ ] `.gitignore`: исключить IDE/`target/`]  — _updated 2025-09-22T06:19:45.129Z_
+- [[ ] build (pull_request) зелёный]  — _updated 2025-09-22T06:19:45.687Z_
+- [[ ] Trello Plan Apply/Sync расписание/права]  — _updated 2025-09-22T06:19:45.989Z_
+- [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-22T06:19:46.441Z_
+- [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-22T06:20:45.115Z_
+- [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T06:20:46.836Z_
