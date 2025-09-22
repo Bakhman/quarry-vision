@@ -1,6 +1,6 @@
 # Trello Snapshot
 **Board:** QuarryVision — учёт ковшей и рейсов
-**Updated:** 2025-09-22T06:20:46.836Z
+**Updated:** 2025-09-22T06:33:09.506Z
 
 ## List
 - [Эпик 2. Импорт и хранение видео]  — _updated 2025-08-17T10:03:27.304Z_
@@ -142,8 +142,6 @@
 - [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T05:59:52.454Z_
 - [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T06:00:34.775Z_
 - [[ ] Идеи/заметки сюда]  — _updated 2025-09-22T06:19:39.007Z_
-- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T06:19:39.580Z_
-- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T06:19:39.943Z_
 - [[ ] OCR (Tess4J) — smoke-тест]  — _updated 2025-09-22T06:19:40.260Z_
 - [[ ] Persistence (Postgres) — миграции + запись]  — _updated 2025-09-22T06:19:40.637Z_
 - [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-09-22T06:19:40.924Z_
@@ -160,3 +158,5 @@
 - [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-22T06:19:46.441Z_
 - [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-09-22T06:20:45.115Z_
 - [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-09-22T06:20:46.836Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-09-22T06:33:07.510Z_
+- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-09-22T06:33:09.506Z_
