@@ -24,11 +24,15 @@ public class Boot extends Application {
         // временно: вызвать ingest-test, если нужно
         try {
             var args = getParameters().getRaw();
-            var src = args.isEmpty() ? cfg.imp().source() : args.get(0);
-            runIngestTest(Path.of("F:/USB"), cfg);
+            var usbPath = args.isEmpty() ? cfg.imp().source() : args.get(0);
+            runIngestTest(Path.of(usbPath), cfg);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 
     /** Тестовый запуск USB-ingest (вызывает UsbIngestService поверх IngestProcessor). */
@@ -37,9 +41,5 @@ public class Boot extends Application {
         var svc = new UsbIngestService(proc, cfg.imp().patterns());
         int n = svc.scanAndIngest(usbRoot);
         System.out.println("Ingest complete. New files: " + n);
-    }
-
-    public static void main(String[] args) {
-        launch(args);
     }
 }
