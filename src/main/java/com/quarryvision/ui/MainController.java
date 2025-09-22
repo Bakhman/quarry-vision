@@ -1,7 +1,11 @@
 package com.quarryvision.ui;
 
+import com.quarryvision.app.Config;
 import com.quarryvision.core.db.Pg;
+import com.quarryvision.core.importer.IngestProcessor;
+import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.video.CameraWorker;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
@@ -9,6 +13,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 
+import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -16,6 +21,7 @@ import java.util.concurrent.Executors;
 public class MainController {
     private final BorderPane root = new BorderPane();
     private final ExecutorService exec = Executors.newFixedThreadPool(4);
+    private final Config cfg = Config.load();
 
     public MainController() {
         TabPane tabs = new TabPane();
@@ -25,12 +31,34 @@ public class MainController {
         VBox importBox = new VBox(10);
         importBox.setPadding(new Insets(12));
         TextField path = new TextField();
-        path.setPromptText("F:/");
-        Button scan = new Button("Сканировать (заглушка)");
+        path.setPromptText(cfg.imp().source() != null ? cfg.imp().source() : "F:/USB");
+        Button scan = new Button("Сканировать");
         TextArea log = new TextArea();
         log.setEditable(false);
         log.setPrefRowCount(10);
-        scan.setOnAction(e -> log.appendText("Сканирую: " + path.getText() + " .../n"));
+        scan.setOnAction(e -> {
+            String src = path.getText().isBlank()
+                    ? (cfg.imp().source() == null ? "" : cfg.imp().source())
+                    : path.getText();
+            if (src.isBlank()) {
+                log.appendText("Укажи путь к источнику.\n");
+                return;
+            }
+            scan.setDisable(true);
+            log.appendText("Сканирую: " + src + " ...\n");
+            exec.submit(() -> {
+                try {
+                    var proc = new IngestProcessor(Path.of(cfg.imp().inbox()));
+                    var svc  = new UsbIngestService(proc, cfg.imp().patterns());
+                    int n = svc.scanAndIngest(Path.of(src));
+                    Platform.runLater(() -> log.appendText("Готово. Новых файлов: " + n + "\n"));
+                } catch (Exception ex) {
+                    Platform.runLater(() -> log.appendText("Ошибка: " + ex + "\n"));
+                } finally {
+                    Platform.runLater(() -> scan.setDisable(false));
+                }
+            });
+        });
         importBox.getChildren().addAll(new Label("Import video"), path, scan, log);
         tabs.getTabs().add(new Tab("Import", importBox));
 
@@ -40,6 +68,7 @@ public class MainController {
         ProgressBar pb = new ProgressBar(0);
         Button sim = new Button("Симуляция очереди");
         sim.setOnAction(e -> pb.setProgress(Math.min(1.0, pb.getProgress()+0.1)));
+        q.getChildren().addAll(pb, sim);
         tabs.getTabs().add(new Tab("Queue", q));
 
         // Reports
