@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.bytedeco.opencv.global.opencv_videoio;
+import org.bytedeco.opencv.opencv_videoio.VideoCapture;
 
 /** Сканирует srcRoot, фильтрует по маскам, передаёт каждый файл в IngestProcessor.
  * Дедупликация по SHA-256 уже реализована в IngestProcessor (manifest.txt).
@@ -67,6 +69,20 @@ public final class UsbIngestService {
             }
         }
         return false;
+    }
+
+    /** Получить длительность видео в миллисекундах. Возвращфет 0 при ошибке. */
+    public static long getDurationsMs(Path file) {
+        try (VideoCapture cap = new VideoCapture(file.toString())) {
+            if (!cap.isOpened()) return 0L;
+            double fps = cap.get(opencv_videoio.CAP_PROP_FPS);
+            if (fps <= 0) fps = 25.0;
+            double frames = cap.get(opencv_videoio.CAP_PROP_FRAME_COUNT);
+            return (long) ((frames / fps) * 1000);
+        } catch (Exception e) {
+            log.warn("cannot read duration {}: {}", file, e.toString());
+            return 0L;
+        }
     }
 
 }

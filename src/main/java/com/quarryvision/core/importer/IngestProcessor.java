@@ -60,10 +60,10 @@ public class IngestProcessor {
         }
         Path dst = inbox.resolve(src.getFileName().toString());
         Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING);
-
+        long duration = UsbIngestService.getDurationsMs(src);
         try (var bw = Files.newBufferedWriter(manifest, StandardCharsets.UTF_8,
                 StandardOpenOption.APPEND)) {
-            bw.write(hash + " " + src.toAbsolutePath());
+            bw.write(hash + " " + src.toAbsolutePath() + " duration=" + duration + "ms");
             bw.newLine();
         }
         return dst;
