@@ -37,7 +37,7 @@ public final class BucketDetector {
     public DetectionResult detect(Path videoPath) {
         try (VideoCapture cap = new VideoCapture(videoPath.toString())) {
             if (!cap.isOpened()) {
-                log.warn("cannot open video: {}", videoPath);
+                log.error("VideoCapture cannot open: {}", videoPath);
                 return new DetectionResult(videoPath, 0, List.of(), 0.0, 0);
             }
             double fps = cap.get(opencv_videoio.CAP_PROP_FPS);
@@ -53,17 +53,31 @@ public final class BucketDetector {
             List<Instant> stamps = new ArrayList<>();
             long lastEventFrame = -cooldownFrames - 1;
 
-            // читаем первый кадр
+            // первый кадр
             if (!cap.read(prev) || prev.empty()) {
+                log.error("First frame is empty: {}", videoPath);
                 return new DetectionResult(videoPath, 0, List.of(), fps, frameCount);
             }
             opencv_imgproc.cvtColor(prev, grayPrev, opencv_imgproc.COLOR_BGR2GRAY);
-            opencv_imgproc.GaussianBlur(grayPrev, grayPrev, new Size(5,5), 0);
+            opencv_imgproc.GaussianBlur(grayPrev, grayPrev, new Size(5, 5), 0);
 
             long idx = 1;
-            while (cap.read(frame) && !frame.empty()) {
+            while (true) {
+                if (!cap.read(frame) || frame.empty()) {
+                    log.warn("Empty frame at idx={} file={}", idx, videoPath);
+                    break;
+                }
                 // шаг через несколько кадров
-                for (int s = 1; s < stepFrames && cap.read(frame); s++) idx++;
+                for (int s = 1; s < stepFrames; s++) {
+                    if (!cap.read(frame) || frame.empty()) { break; }
+                    idx++;
+                }
+
+                // после шага могли получить пустой кадр
+                if (frame == null || frame.empty()) {
+                    log.warn("Empty frame after stepping at idx={} file={}", idx, videoPath);
+                    break;
+                }
 
                 opencv_imgproc.cvtColor(frame, gray, opencv_imgproc.COLOR_BGR2GRAY);
                 opencv_imgproc.GaussianBlur(gray, gray, new Size(5, 5), 0);
@@ -75,7 +89,7 @@ public final class BucketDetector {
                 double ratio = white / (diff.rows() * diff.cols());
 
                 if (ratio >= eventRatio && (idx - lastEventFrame) > cooldownFrames) {
-                    long ms= (long) ((idx / fps) * 1000.0);
+                    long ms = (long) ((idx / fps) * 1000.0);
                     stamps.add(Instant.ofEpochMilli(ms));
                     lastEventFrame = idx;
                 }
