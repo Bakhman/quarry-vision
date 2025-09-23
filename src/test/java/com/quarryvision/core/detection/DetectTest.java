@@ -1,13 +1,20 @@
 package com.quarryvision.core.detection;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class DetectTest {
     @Test
-    public void runDetection() {
+    public void runDetection() throws Exception {
         Path video = Path.of("E:/INBOX/loading_of_crushed_stone_2.mp4");
+        System.out.println("Exists: " + Files.exists(video) + " size=" + Files.size(video));
+
+        Assumptions.assumeTrue(Files.exists(video),
+                                "Тест пропущен: файл не найден " + video);
+
         BucketDetector det = new BucketDetector(
                 5,
                 25,
