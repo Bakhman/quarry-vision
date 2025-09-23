@@ -1,5 +1,6 @@
 package com.quarryvision.core.detection;
 
+import org.bytedeco.opencv.opencv_core.Size;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
@@ -19,10 +20,12 @@ public class DetectTest {
                                 "Тест пропущен: файл не найден " + video);
 
         BucketDetector det = new BucketDetector(
-                5,
-                25,
-                0.02,
-                8
+                12,
+                40,
+                0.08,
+                30,
+                8_000,
+                new Size(3,3)
         );
 
         DetectionResult res = det.detect(video);

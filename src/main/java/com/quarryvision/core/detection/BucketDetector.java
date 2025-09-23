@@ -26,12 +26,19 @@ public final class BucketDetector {
     private final int diffThreshold;    // порог бинаризации 15..40
     private final double eventRatio;    // доля «белых» пикселей для события, например 0.02
     private final int cooldownFrames;   // анти-дребезг, минимум кадров между событиями
+    private final int minChangedPixels; // минимальное число «белых» пикселей
+    private final Size morphKernel;     // ядро морфологии
 
-    public BucketDetector(int stepFrames, int diffThreshold, double eventRatio, int cooldownFrames) {
+    /** Расширенный конструктор: можно задать порог по пикселям и ядро морфологии. */
+    public BucketDetector(int stepFrames, int diffThreshold, double eventRatio, int cooldownFrames,
+                          int minChangedPixels, Size morphKernel) {
         this.stepFrames = Math.max(1, stepFrames);
         this.diffThreshold = Math.max(1, diffThreshold);
         this.eventRatio = Math.max(1e-4, eventRatio);
         this.cooldownFrames = Math.max(0, cooldownFrames);
+        this.minChangedPixels = Math.max(0, minChangedPixels);
+        this.morphKernel = (morphKernel == null ? new Size(3, 3) : morphKernel);
+
     }
 
     public DetectionResult detect(Path videoPath) {
@@ -49,6 +56,11 @@ public final class BucketDetector {
             Mat grayPrev = new Mat();
             Mat gray = new Mat();
             Mat diff = new Mat();
+            // ядро морфологии (Mat), построенное из заданного Size
+            Mat kernel = opencv_imgproc.getStructuringElement(
+                    opencv_imgproc.MORPH_RECT,
+                    morphKernel
+            );
 
             List<Instant> stamps = new ArrayList<>();
             long lastEventFrame = -cooldownFrames - 1;
@@ -84,9 +96,17 @@ public final class BucketDetector {
 
                 opencv_core.absdiff(gray, grayPrev, diff);
                 opencv_imgproc.threshold(diff, diff, diffThreshold, 255, opencv_imgproc.THRESH_BINARY);
-
+                // Морфология: убираем мелкий шум и заращиваем разрывы
+                opencv_imgproc.erode(diff, diff, kernel);
+                opencv_imgproc.dilate(diff, diff, kernel);
                 double white = opencv_core.countNonZero(diff);
-                double ratio = white / (diff.rows() * diff.cols());
+                // Отсечь мелкие всплески
+                if (white < minChangedPixels) {
+                    gray.copyTo(grayPrev);
+                    idx++;
+                    continue;
+                }
+                 double ratio = white / (double) (diff.rows() * diff.cols());
 
                 if (ratio >= eventRatio && (idx - lastEventFrame) > cooldownFrames) {
                     long ms = (long) ((idx / fps) * 1000.0);
