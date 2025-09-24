@@ -50,4 +50,4 @@ project-structure.txt
 .chat-start-blocks.md
 
 ### Separate directory for training files and cheat sheets ###
-/practice/
+/.practice/
