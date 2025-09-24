@@ -12,6 +12,9 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
+import com.quarryvision.core.detection.BucketDetector;
+import org.bytedeco.opencv.opencv_core.Size;
+
 
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
@@ -33,6 +36,7 @@ public class MainController {
         TextField path = new TextField();
         path.setPromptText(cfg.imp().source() != null ? cfg.imp().source() : "F:/USB");
         Button scan = new Button("Сканировать");
+        Button detect = new Button("Detect");
         TextArea log = new TextArea();
         log.setEditable(false);
         log.setPrefRowCount(10);
@@ -59,7 +63,44 @@ public class MainController {
                 }
             });
         });
-        importBox.getChildren().addAll(new Label("Import video"), path, scan, log);
+        // Detect: запустить BucketDetector по указанному видео (путь в поле)
+        detect.setOnAction(e -> {
+            String src = path.getText().isBlank()
+                    ? (cfg.imp().source() == null ? "" : cfg.imp().source())
+                    : path.getText();
+            if (src.isBlank()) {
+                log.appendText("Укажи путь к видео для детекции.\n");
+                return;
+            }
+            detect.setDisable(true);
+            log.appendText("Detect: " + src + " ...\n");
+            exec.submit(() -> {
+                try {
+                    var det = new BucketDetector(
+                            15, 45, 0.12, 60, 8000, new Size(3,3)
+                    );
+                    var res = det.detect(java.nio.file.Path.of(src));
+                    javafx.application.Platform.runLater(() -> {
+                        log.appendText("Events=" + res.events() +
+                                " fps=" + res.fps() + " frames=" + res.frames() + "\n");
+                        var list = res.timestampsMs();
+                        int show = Math.min(10, list.size());
+                        for (int i = 0; i < show; i++) {
+                            log.appendText("  @" + list.get(i).toEpochMilli() + " ms\n");
+                        }
+                        if (list.size() > show) {
+                            log.appendText("  ... +" + (list.size() - show) + " more\n");
+                        }
+                    });
+                } catch (Exception ex) {
+                    javafx.application.Platform.runLater(() -> log.appendText("Detect error: " + ex + "\n"));
+                } finally {
+                    javafx.application.Platform.runLater(() -> detect.setDisable(false));
+                }
+            });
+        });
+
+        importBox.getChildren().addAll(new Label("Import video"), path, scan, detect, log);
         tabs.getTabs().add(new Tab("Import", importBox));
 
         // Queue
