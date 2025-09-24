@@ -5,6 +5,8 @@ import com.quarryvision.core.db.Pg;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.video.CameraWorker;
+import com.quarryvision.core.detection.BucketDetector;
+import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
@@ -12,8 +14,6 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
-import com.quarryvision.core.detection.BucketDetector;
-import org.bytedeco.opencv.opencv_core.Size;
 
 
 import java.nio.file.Path;
@@ -76,8 +76,14 @@ public class MainController {
             log.appendText("Detect: " + src + " ...\n");
             exec.submit(() -> {
                 try {
+                    var dc = cfg.detection();
                     var det = new BucketDetector(
-                            15, 45, 0.12, 60, 8000, new Size(3,3)
+                            dc.stepFrames(),
+                            dc.diffThreshold(),
+                            dc.eventRatio(),
+                            dc.cooldownFrames(),
+                            dc.minChangedPixels(),
+                            new Size(dc.morphW(), dc.morphH())
                     );
                     var res = det.detect(java.nio.file.Path.of(src));
                     javafx.application.Platform.runLater(() -> {
