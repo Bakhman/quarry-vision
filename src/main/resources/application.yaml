@@ -12,3 +12,12 @@ import:
     - "*.mp4"
     - "*.mkv"
     - "*.ts"
+detect:
+  stepFrames: 15
+  diffThreshold: 45
+  eventRatio: 0.14
+  cooldownFrames: 120
+  minChangedPixels: 25000
+  morphKernel:
+    w: 3
+    h: 3
