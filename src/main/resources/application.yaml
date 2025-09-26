@@ -15,8 +15,8 @@ import:
 detect:
   stepFrames: 15
   diffThreshold: 45
-  eventRatio: 0.16
+  eventRatio: 0.18
   cooldownFrames: 150
-  minChangedPixels: 30000
+  minChangedPixels: 35000
   morphKernel: { w: 3, h: 3}
-  mergeMs: 4500   # события ближе этого окна считаем одной погрузкой
+  mergeMs: 5000   # события ближе этого окна считаем одной погрузкой
