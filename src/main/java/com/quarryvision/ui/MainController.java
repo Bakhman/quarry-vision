@@ -83,7 +83,8 @@ public class MainController {
                             dc.eventRatio(),
                             dc.cooldownFrames(),
                             dc.minChangedPixels(),
-                            new Size(dc.morphW(), dc.morphH())
+                            new Size(dc.morphW(), dc.morphH()),
+                            dc.mergeMs()
                     );
                     var res = det.detect(java.nio.file.Path.of(src));
                     javafx.application.Platform.runLater(() -> {

@@ -11,7 +11,8 @@ public record Config(Db db, ImportConf imp, DetectConf detection) {
     public record Db(String url, String user, String pass) {}
     public record ImportConf(List<String> patterns, String inbox, String source) {}
     public record DetectConf(int stepFrames, int diffThreshold, double eventRatio,
-                             int cooldownFrames, int minChangedPixels, int morphW, int morphH) {}
+                             int cooldownFrames, int minChangedPixels, int morphW, int morphH,
+                             int mergeMs) {}
 
     @SuppressWarnings("unchecked")
     public static Config load() {
@@ -34,11 +35,11 @@ public record Config(Db db, ImportConf imp, DetectConf detection) {
             int minChangedPixels = det.get("minChangedPixels") != null ? ((Number) det.get("minChangedPixels")).intValue() : 25000;
             int morphW           = mk.get("w")                 != null ? ((Number) mk.get("w")).intValue()                 : 3;
             int morphH           = mk.get("h")                 != null ? ((Number) mk.get("h")).intValue()                 : 3;
-
+            int mergeMs = det.get("mergeMs") != null ? ((Number) det.get("mergeMs")).intValue() : 4000;
             return  new Config(
                     new Db((String) db.get("url"), (String) db.get("user"), (String) db.get("pass")),
                     new ImportConf((List<String>) imp.get("patterns"), (String) imp.get("inbox"), (String) imp.get("source")),
-                    new DetectConf(stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, morphW, morphH)
+                    new DetectConf(stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, morphW, morphH, mergeMs)
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to load application.yaml", e);
