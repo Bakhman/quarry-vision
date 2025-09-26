@@ -16,6 +16,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,6 +73,11 @@ public class MainController {
                 log.appendText("Укажи путь к видео для детекции.\n");
                 return;
             }
+            Path p = Path.of(src);
+            if (Files.exists(p) || Files.isRegularFile(p)) {
+                log.appendText("File <<" + p + ">> not found\n");
+                return;
+            }
             detect.setDisable(true);
             log.appendText("Detect: " + src + " ...\n");
             exec.submit(() -> {
@@ -86,7 +92,7 @@ public class MainController {
                             new Size(dc.morphW(), dc.morphH()),
                             dc.mergeMs()
                     );
-                    var res = det.detect(java.nio.file.Path.of(src));
+                    var res = det.detect(p);
                     javafx.application.Platform.runLater(() -> {
                         var list = res.timestampsMs();
                         log.appendText("Events=" + list.size() +
