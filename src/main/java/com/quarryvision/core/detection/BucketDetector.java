@@ -28,17 +28,37 @@ public final class BucketDetector {
     private final int cooldownFrames;   // анти-дребезг, минимум кадров между событиями
     private final int minChangedPixels; // минимальное число «белых» пикселей
     private final Size morphKernel;     // ядро морфологии
+    private final int mergeMs;
 
     /** Расширенный конструктор: можно задать порог по пикселям и ядро морфологии. */
     public BucketDetector(int stepFrames, int diffThreshold, double eventRatio, int cooldownFrames,
                           int minChangedPixels, Size morphKernel) {
+        this(stepFrames, diffThreshold, eventRatio, cooldownFrames, 5_000, new Size(3, 3), 4_000);
+    }
+
+    public BucketDetector(int stepFrames, int diffThreshold, double eventRatio, int cooldownFrames,
+                          int minChangedPixels, Size morphKernel, int mergeMs) {
         this.stepFrames = Math.max(1, stepFrames);
         this.diffThreshold = Math.max(1, diffThreshold);
         this.eventRatio = Math.max(1e-4, eventRatio);
         this.cooldownFrames = Math.max(0, cooldownFrames);
         this.minChangedPixels = Math.max(0, minChangedPixels);
         this.morphKernel = (morphKernel == null ? new Size(3, 3) : morphKernel);
+        this.mergeMs = Math.max(0, mergeMs);
 
+    }
+
+    private static List<Instant> mergeClose(List<Instant> src, long mergeMs) {
+        if (src.isEmpty()) return List.of();
+        List<Instant> out = new ArrayList<>();
+        Instant last = null;
+        for (Instant t: src) {
+            if (last == null || t.toEpochMilli() - last.toEpochMilli() > mergeMs) {
+                out.add(t);
+                last = t;
+            }
+        }
+        return out;
     }
 
     public DetectionResult detect(Path videoPath) {
@@ -117,8 +137,9 @@ public final class BucketDetector {
                 gray.copyTo(grayPrev);
                 idx++;
             }
-
-            return new DetectionResult(videoPath, stamps.size(), List.copyOf(stamps), fps, frameCount);
+            List<Instant> merged = mergeClose(stamps, /* mergeMs */ this.mergeMs);
+            return new DetectionResult(videoPath, merged.size(), List.copyOf(stamps), fps, frameCount);
         }
+
     }
 }
