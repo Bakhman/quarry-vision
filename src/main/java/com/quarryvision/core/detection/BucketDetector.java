@@ -138,7 +138,7 @@ public final class BucketDetector {
                 idx++;
             }
             List<Instant> merged = mergeClose(stamps, /* mergeMs */ this.mergeMs);
-            return new DetectionResult(videoPath, merged.size(), List.copyOf(stamps), fps, frameCount);
+            return new DetectionResult(videoPath, merged.size(), List.copyOf(merged), fps, frameCount);
         }
 
     }

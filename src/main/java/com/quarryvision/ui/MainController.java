@@ -88,9 +88,9 @@ public class MainController {
                     );
                     var res = det.detect(java.nio.file.Path.of(src));
                     javafx.application.Platform.runLater(() -> {
-                        log.appendText("Events=" + res.events() +
-                                " fps=" + res.fps() + " frames=" + res.frames() + "\n");
                         var list = res.timestampsMs();
+                        log.appendText("Events=" + list.size() +
+                                " fps=" + res.fps() + " frames=" + res.frames() + "\n");
                         int show = Math.min(10, list.size());
                         for (int i = 0; i < show; i++) {
                             log.appendText("  @" + list.get(i).toEpochMilli() + " ms\n");
