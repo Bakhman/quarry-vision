@@ -74,7 +74,7 @@ public class MainController {
                 return;
             }
             Path p = Path.of(src);
-            if (!Files.exists(p) || Files.isRegularFile(p)) {
+            if (!Files.exists(p) || !Files.isRegularFile(p)) {
                 log.appendText("File <<" + p + ">> not found\n");
                 return;
             }
