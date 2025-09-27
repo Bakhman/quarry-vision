@@ -53,7 +53,7 @@ public final class BucketDetector {
         List<Instant> out = new ArrayList<>();
         Instant last = null;
         for (Instant t: src) {
-            if (last == null || t.toEpochMilli() - last.toEpochMilli() > mergeMs) {
+            if (last == null || (t.toEpochMilli() - last.toEpochMilli()) > mergeMs) {
                 out.add(t);
                 last = t;
             }
@@ -106,7 +106,7 @@ public final class BucketDetector {
                 }
 
                 // после шага могли получить пустой кадр
-                if (frame == null || frame.empty()) {
+                if (frame.empty()) {
                     log.warn("Empty frame after stepping at idx={} file={}", idx, videoPath);
                     break;
                 }
@@ -137,7 +137,8 @@ public final class BucketDetector {
                 gray.copyTo(grayPrev);
                 idx++;
             }
-            List<Instant> merged = mergeClose(stamps, /* mergeMs */ this.mergeMs);
+            long effectiveMergeMs = Long.getLong("qv.mergeMs", this.mergeMs);
+            List<Instant> merged = mergeClose(stamps, effectiveMergeMs);
             return new DetectionResult(videoPath, merged.size(), List.copyOf(merged), fps, frameCount);
         }
 
