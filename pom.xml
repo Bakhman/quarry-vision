@@ -89,7 +89,19 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <useSystemClassLoader>false</useSystemClassLoader>
+                    <!-- меньше памяти, быстрее старт -->
+                    <argLine>-Xms128m -Xmx256m</argLine>
+
+                    <!-- запрещаем форки, чтобы не грузить OpenCV заново -->
+                    <forkCount>0</forkCount>
+                    <reuseForks>true</reuseForks>
+
+                    <!-- постоянный кэш для JavaCPP -->
+                    <systemPropertyVariables>
+                        <org.bytedeco.javacpp.cachedir>
+                            ${user.home}/.javacpp-cache
+                        </org.bytedeco.javacpp.cachedir>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
 
@@ -112,28 +124,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
-                <configuration>
-                    <!-- меньше памяти, быстрее старт -->
-                    <argLine>-Xms128m -Xmx256m</argLine>
-
-                    <!-- запрещаем форки, чтобы не грузить OpenCV заново -->
-                    <forkCount>0</forkCount>
-                    <reuseForks>true</reuseForks>
-
-                    <!-- постоянный кэш для JavaCPP -->
-                    <systemPropertyVariables>
-                        <org.bytedeco.javacpp.cachedir>
-                            ${user.home}/.javacpp-cache
-                        </org.bytedeco.javacpp.cachedir>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
-
         </plugins>
     </build>
 

@@ -62,6 +62,9 @@ public final class BucketDetector {
     }
 
     public DetectionResult detect(Path videoPath) {
+        long effectiveMergeMs = Long.getLong("qv.mergeMs", this.mergeMs);
+        log.info("Detect params: stepFrames={}, diffThreshold={}, eventRatio={}, cooldownFrames={}, minChangedPixels={}, mergeMs={}",
+                stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, effectiveMergeMs);
         try (VideoCapture cap = new VideoCapture(videoPath.toString())) {
             if (!cap.isOpened()) {
                 log.error("VideoCapture cannot open: {}", videoPath);
@@ -96,19 +99,12 @@ public final class BucketDetector {
             long idx = 1;
             while (true) {
                 if (!cap.read(frame) || frame.empty()) {
-                    log.warn("Empty frame at idx={} file={}", idx, videoPath);
-                    break;
+                    break; // EOF/кадр пуст — выходим без WARN
                 }
                 // шаг через несколько кадров
                 for (int s = 1; s < stepFrames; s++) {
                     if (!cap.read(frame) || frame.empty()) { break; }
                     idx++;
-                }
-
-                // после шага могли получить пустой кадр
-                if (frame.empty()) {
-                    log.warn("Empty frame after stepping at idx={} file={}", idx, videoPath);
-                    break;
                 }
 
                 opencv_imgproc.cvtColor(frame, gray, opencv_imgproc.COLOR_BGR2GRAY);
@@ -137,7 +133,6 @@ public final class BucketDetector {
                 gray.copyTo(grayPrev);
                 idx++;
             }
-            long effectiveMergeMs = Long.getLong("qv.mergeMs", this.mergeMs);
             List<Instant> merged = mergeClose(stamps, effectiveMergeMs);
             return new DetectionResult(videoPath, merged.size(), List.copyOf(merged), fps, frameCount);
         }
