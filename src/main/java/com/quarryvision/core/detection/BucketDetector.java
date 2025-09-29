@@ -65,6 +65,18 @@ public final class BucketDetector {
         long effectiveMergeMs = Long.getLong("qv.mergeMs", this.mergeMs);
         log.info("Detect params: stepFrames={}, diffThreshold={}, eventRatio={}, cooldownFrames={}, minChangedPixels={}, mergeMs={}",
                 stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, effectiveMergeMs);
+        try {
+            if (!java.nio.file.Files.isRegularFile(videoPath) || java.nio.file.Files.size(videoPath) == 0L) {
+                log.error("Video file invalid: exists={} size={} path={}",
+                        java.nio.file.Files.exists(videoPath),
+                        java.nio.file.Files.exists(videoPath) ? java.nio.file.Files.size(videoPath) : -1,
+                        videoPath);
+                return new DetectionResult(videoPath, 0, List.of(), 0.0, 0);
+            }
+        } catch (Exception e) {
+            log.error("Video file check failed: {}", videoPath, e);
+            return new DetectionResult(videoPath, 0, List.of(), 0.0, 0);
+        }
         try (VideoCapture cap = new VideoCapture(videoPath.toString())) {
             if (!cap.isOpened()) {
                 log.error("VideoCapture cannot open: {}", videoPath);
@@ -105,6 +117,11 @@ public final class BucketDetector {
                 for (int s = 1; s < stepFrames; s++) {
                     if (!cap.read(frame) || frame.empty()) { break; }
                     idx++;
+                }
+                // могли выйти из внутреннего шага из-за EOF -> кадр пустой
+                if (frame.empty()) {
+                    // тихо выходим: конец файла
+                    break;
                 }
 
                 opencv_imgproc.cvtColor(frame, gray, opencv_imgproc.COLOR_BGR2GRAY);

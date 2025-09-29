@@ -51,44 +51,27 @@ public final class Pg {
         return ds.getConnection();
     }
 
-    /** upsert по пути видео, возвращает id видео. */
+    /** Вставить/обновить видео по уникальному path. Возвращает id. */
     public static int upsertVideo(Path path, double fps, long frames) {
-        final String sel = "select id from videos where path = ?";
-        final String ins = "insert into videos(path,fps,frames) values(?,?,?) returning id";
-        final String upd = "update videos set fps=?, frames=? where id=? returning id";
-        try (Connection c = get()) {
-            // select
-            Integer id = null;
-            try (PreparedStatement ps = c.prepareStatement(sel)) {
-                ps.setString(1, path.toString());
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) id = rs.getInt(1);
-                }
+        final String sql = """
+        INSERT INTO videos(path, fps, frames)
+        VALUES (?, ?, ?)
+        ON CONFLICT(path) DO UPDATE
+          SET fps = EXCLUDED.fps,
+              frames = EXCLUDED.frames
+        RETURNING id
+        """;
+        try (var c = get();
+             var ps = c.prepareStatement(sql)) {
+            ps.setString(1, path.toString());
+            ps.setDouble(2, fps);
+            ps.setLong(3, frames);
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
             }
-            if (id == null) {
-                try (PreparedStatement ps = c.prepareStatement(ins)) {
-                    ps.setString(1, path.toString());
-                    ps.setDouble(2, fps);
-                    ps.setLong(3, frames);
-                    try(ResultSet rs = ps.executeQuery()) {
-                        rs.next();
-                        id = rs.getInt(1);
-                    }
-                }
-            } else {
-                try (PreparedStatement ps = c.prepareStatement(upd)) {
-                    ps.setDouble(1, fps);
-                    ps.setLong(2, frames);
-                    ps.setInt(3, id);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        rs.next();
-                        id = rs.getInt(1);
-                    }
-                }
-            }
-            return id;
-        } catch(SQLException e){
-            throw new RuntimeException("upsertVideo failed for " + path, e);
+            throw new RuntimeException("upsertVideo failed for " + path);
+        } catch (SQLException e) {
+            throw new RuntimeException("upsertVideo failed for " + path + " sqlstate=" + e.getSQLState(), e);
         }
     }
 
