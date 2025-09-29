@@ -116,6 +116,40 @@ public class MainController {
         importBox.getChildren().addAll(new Label("Import video"), path, scan, detect, log);
         tabs.getTabs().add(new Tab("Import", importBox));
 
+        // Detect UI: поле и кнопка
+        TextField detectPath = new TextField();
+        detectPath.setPromptText("E:/INBOX/locs.mp4");
+        Button detectBtn = new Button("Detect");
+        detectBtn.setOnAction(e -> {
+            String src = detectPath.getText().trim();
+            Path p = Path.of(src);
+            if (!Files.isRegularFile(p)) {
+                log.appendText("File <<" + src + ">> not found\n");
+                return;
+            }
+            detectBtn.setDisable(true);
+            exec.submit(() -> {
+                try {
+                    var dc = cfg.detection();
+                    var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
+                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs());
+                    var res = det.detect(p);
+                    int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
+                    int detId = Pg.insertDetection(videoId, dc.mergeMs(), res.timestampsMs());
+                    Platform.runLater(() -> {
+                        log.appendText(String.format("Detect: %s ...%n", src));
+                        log.appendText(String.format("Saved detection id=%d videoId=%d events=%d%n",
+                                detId, videoId, res.timestampsMs().size()));
+                    });
+                } catch (Exception ex2) {
+                    Platform.runLater(() -> log.appendText("Detect error: " + ex2 + "\n"));
+                } finally {
+                    Platform.runLater(() -> detectBtn.setDisable(false));
+                }
+            });
+        });
+        importBox.getChildren().addAll(new Separator(), new Label("Detect video"), detectPath, detectBtn);
+
         // Queue
         VBox q = new VBox(10);
         q.setPadding(new Insets(12));

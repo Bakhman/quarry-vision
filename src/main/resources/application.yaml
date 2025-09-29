@@ -1,9 +1,9 @@
 app:
   name: QuarryVision
 db:
-  url: jdbc:postgresql://localhost:5432/qv
-  user: postgres
-  pass: secret
+  url: jdbc:postgresql://localhost:5432/quarryvision
+  user: quarry
+  pass: quarry
 
 import:
   inbox: E:/INBOX
