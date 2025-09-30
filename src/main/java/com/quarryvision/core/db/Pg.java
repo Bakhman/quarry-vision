@@ -33,6 +33,12 @@ public final class Pg {
         hc.setMaximumPoolSize(5);
         hc.setMinimumIdle(1);
         hc.setPoolName("qv-pool");
+        // быстрые таймауты и health-check
+        hc.setConnectionTimeout(5000);
+        hc.setValidationTimeout(3000);
+        hc.setIdleTimeout(300000);
+        hc.setMaxLifetime(1800000);
+        hc.setConnectionTestQuery("SELECT 1");
         ds=new HikariDataSource(hc);
         log.info("Pg: pool started url={}", cfg.db().url());
 
@@ -43,7 +49,7 @@ public final class Pg {
                 .baselineOnMigrate(true)
                 .load();
         fw.migrate();
-        log.info("Pg: flyway migrate don");
+        log.info("Pg: flyway migrate done");
     }
 
     public static Connection get() throws SQLException {
