@@ -13,6 +13,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -111,6 +114,66 @@ public final class Pg {
             return detId;
         } catch (SQLException e) {
             throw new RuntimeException("insertDetection failed for video_id=" + videoId, e);
+        }
+    }
+
+    /** Последние детекции: "#<id> | <events> ev | merge=<ms> | <YYYY-MM-DD HH:MM> | <path>" */
+    public static List<String> listRecentDetections(int limit) {
+        final String sql = """
+                SELECT d.id,
+                       v.path,
+                       d.events_count,
+                       d.merge_ms,
+                       d.created_at
+                FROM detections d
+                JOIN videos v ON v.id = d.video_id
+                ORDERED BY d.id DESC
+                LIMIT ?
+                """;
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)
+        ) {
+            ps.setInt(1, Math.max(1, limit));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<String> out = new ArrayList<>();
+                while (rs.next()) {
+                    int id = rs.getInt(1);
+                    String path = rs.getString(2);
+                    int events = rs.getInt(3);
+                    int mergeMs = rs.getInt(4);
+                    OffsetDateTime ts = rs.getObject(5, OffsetDateTime.class);
+                    String when = ts == null
+                            ? ""
+                            : ts.atZoneSameInstant(ZoneOffset.systemDefault()).toLocalDateTime().toString().replace('T', ' ');
+                    out.add("#" + id + " | " + events + " ev | merge=" + mergeMs + " | " + when + " | " + path);
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("listRecentDetections failed", e);
+        }
+    }
+    /** Временные метки событий для детекции. */
+    public static List<Long> listEventsMs(int detectionId) {
+        final String sql = """
+                SELECT t_ms
+                FROM events
+                WHERE detectionId = ?
+                ORDER BY t_ms
+                """;
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)
+        ) {
+            ps.setInt(1, detectionId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Long> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(rs.getLong(1));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("listEventsMs failed for detection_id=" + detectionId, e);
         }
     }
     public static void close() {

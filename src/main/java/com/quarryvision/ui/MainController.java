@@ -6,18 +6,16 @@ import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.video.CameraWorker;
 import com.quarryvision.core.detection.BucketDetector;
+import javafx.scene.layout.*;
 import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
 
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -162,7 +160,62 @@ public class MainController {
         // Reports
         VBox rep = new VBox(10);
         rep.setPadding(new Insets(12));
-        rep.getChildren().addAll(new Label("Отчеты появятся позже"));
+        Label hdr = new Label("Detections history");
+        ListView<String> list = new ListView<>();
+        list.setPrefHeight(260);
+        Button refresh = new Button("Refresh");
+        Button showEv = new Button("Show events");
+        TextArea evArea = new TextArea();
+        evArea.setEditable(false);
+        evArea.setPrefRowCount(10);
+        refresh.setOnAction(e -> {
+            refresh.setDisable(true);
+            evArea.clear();
+            exec.submit(() -> {
+                try {
+                    List<String> rows = Pg.listRecentDetections(50);
+                    Platform.runLater(() -> {
+                        list.getItems().setAll(rows);
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        evArea.appendText("Load error: " + ex + "\n");
+                    });
+                } finally {
+                    Platform.runLater(() -> refresh.setDisable(false));
+                }
+            });
+        });
+
+        showEv.setOnAction(e -> {
+            String sel = list.getSelectionModel().getSelectedItem();
+            if (sel == null || sel.isBlank()) return;
+            // формат строки: "#<id> | ..."
+            int hash = sel.indexOf('#');
+            int sp = sel.indexOf(' ');
+            if (hash != -1 && sp > hash) {
+                try {
+                    int detId = Integer.parseInt(sel.substring(hash + 1), sp);
+                    evArea.clear();
+                    exec.submit(() -> {
+                        try {
+                            List<Long> ts = Pg.listEventsMs(detId);
+                            Platform.runLater(() -> {
+                                evArea.appendText("Detection #" + detId + " events: " + ts.size() + "\n");
+                                for (Long t : ts) {
+                                    evArea.appendText(" @ " + t + " ms\n");
+                                }
+                            });
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> evArea.appendText("Load error: " + ex + "\n"));
+                        }
+                    });
+                } catch (NumberFormatException ignore) { /* no-op */}
+            }
+        });
+
+        // авто-подгрузка при открытии
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv), list, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // Cameras (stubs)
@@ -176,6 +229,7 @@ public class MainController {
             cams.add(l, (i-1)%2, (i-1)/2);
         }
         tabs.getTabs().add(new Tab("Cameras", cams));
+
 
         root.setCenter(tabs);
 
