@@ -161,7 +161,6 @@ public class MainController {
         VBox rep = new VBox(10);
         rep.setPadding(new Insets(12));
         Label hdr = new Label("Detections history");
-        Label stats = new Label(); // Videos | Detections | Events
         ListView<String> list = new ListView<>();
         list.setPrefHeight(260);
         Button refresh = new Button("Refresh");
@@ -170,6 +169,7 @@ public class MainController {
         TextArea evArea = new TextArea();
         evArea.setEditable(false);
         evArea.setPrefRowCount(10);
+        Label stats = new Label(); // Videos | Detections | Events
         refresh.setOnAction(e -> {
             refresh.setDisable(true);
             evArea.clear();
@@ -210,7 +210,7 @@ public class MainController {
                             Platform.runLater(() -> {
                                 evArea.appendText("Detection #" + detId + " events: " + ts.size() + "\n");
                                 for (Long t : ts) {
-                                    evArea.appendText(" @ " + t + " ms\n");
+                                    evArea.appendText(" @ " + fmtMs(t) + "\n");
                                 }
                             });
                         } catch (Exception ex) {
@@ -233,10 +233,16 @@ public class MainController {
                     exec.submit(() -> {
                         try {
                             Pg.deleteDetection(detId);
+                            // после удаления — перезагрузить список и статистику
+                            List<String> rows = Pg.listRecentDetections(50);
+                            long v = Pg.countVideos();
+                            long d = Pg.countDetections();
+                            long ev = Pg.countEvents();
                             Platform.runLater(() -> {
-                                list.getItems().remove(sel);
-                                evArea.appendText("Deleted detection #" + detId + "\n");
+                                list.getItems().setAll(rows);
+                                stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                                 evArea.clear();
+                                evArea.appendText("Deleted detection #" + detId + "\n");
                             });
                         } catch (Exception ex) {
                             Platform.runLater(() -> {
@@ -252,9 +258,11 @@ public class MainController {
             }
         });
 
-        // авто-подгрузка при открытии
         rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, stats, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
+
+        // авто-подгрузка при открытии
+        Platform.runLater(refresh::fire);
 
         // Cameras (stubs)
         GridPane cams = new GridPane();
@@ -276,6 +284,16 @@ public class MainController {
         exec.submit(new CameraWorker(1, "DEMO-1"));
         exec.submit(new CameraWorker(2, "DEMO-2"));
     }
+
+    private static String fmtMs(long ms) {
+        long s = ms / 1000;
+        long h = s  / 3600;
+        long m = (s % 3600) / 60;
+        long sec = s % 60;
+        long msPart = ms % 1000;
+        return String.format("%02d:%02d:%02d.%03d", h, m, sec, msPart);
+    }
+
     public Pane getRoot() {
         return root;
     }
