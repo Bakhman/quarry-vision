@@ -176,6 +176,18 @@ public final class Pg {
             throw new RuntimeException("listEventsMs failed for detection_id=" + detectionId, e);
         }
     }
+
+    /** Удалить детекцию; события удаляются каскадно. */
+    public static void deleteDetection(int detectionId) {
+        final String sql = "DELETE FROM detections WHERE id = ?";
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, detectionId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("deleteDetection failed for id=" + detectionId, e);
+        }
+    }
     public static void close() {
         System.out.println("[Pg] close(): заглушка");
     }

@@ -165,6 +165,7 @@ public class MainController {
         list.setPrefHeight(260);
         Button refresh = new Button("Refresh");
         Button showEv = new Button("Show events");
+        Button del = new Button("Delete detection");
         TextArea evArea = new TextArea();
         evArea.setEditable(false);
         evArea.setPrefRowCount(10);
@@ -214,8 +215,39 @@ public class MainController {
             }
         });
 
+        del.setOnAction(e -> {
+            String sel = list.getSelectionModel().getSelectedItem();
+            if (sel == null || sel.isBlank()) return;
+            int hash = sel.indexOf('#');
+            int sp = sel.indexOf(' ');
+            if (hash != -1 && sp > hash) {
+                try {
+                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
+                    del.setDisable(true);
+                    exec.submit(() -> {
+                        try {
+                            Pg.deleteDetection(detId);
+                            Platform.runLater(() -> {
+                                list.getItems().remove(sel);
+                                evArea.appendText("Deleted detection #" + detId + "\n");
+                                evArea.clear();
+                            });
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> {
+                                evArea.appendText("Delete error: " + ex + "\n");
+                            });
+                        } finally {
+                            Platform.runLater(() -> {
+                                del.setDisable(false);
+                            });
+                        }
+                    });
+                } catch (NumberFormatException ignore) {/* no-op */}
+            }
+        });
+
         // авто-подгрузка при открытии
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv), list, evArea);
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // Cameras (stubs)
