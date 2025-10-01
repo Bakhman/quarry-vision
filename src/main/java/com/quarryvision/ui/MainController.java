@@ -161,6 +161,7 @@ public class MainController {
         VBox rep = new VBox(10);
         rep.setPadding(new Insets(12));
         Label hdr = new Label("Detections history");
+        Label stats = new Label(); // Videos | Detections | Events
         ListView<String> list = new ListView<>();
         list.setPrefHeight(260);
         Button refresh = new Button("Refresh");
@@ -175,8 +176,12 @@ public class MainController {
             exec.submit(() -> {
                 try {
                     List<String> rows = Pg.listRecentDetections(50);
+                    long v = Pg.countVideos();
+                    long d = Pg.countDetections();
+                    long ev = Pg.countEvents();
                     Platform.runLater(() -> {
                         list.getItems().setAll(rows);
+                        stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                     });
                 } catch (Exception ex) {
                     Platform.runLater(() -> {
@@ -196,7 +201,8 @@ public class MainController {
             int sp = sel.indexOf(' ');
             if (hash != -1 && sp > hash) {
                 try {
-                    int detId = Integer.parseInt(sel.substring(hash + 1), sp);
+                    // fix: корректный разбор "#<id> ..."
+                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
                     evArea.clear();
                     exec.submit(() -> {
                         try {
@@ -247,7 +253,7 @@ public class MainController {
         });
 
         // авто-подгрузка при открытии
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, evArea);
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, stats, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // Cameras (stubs)

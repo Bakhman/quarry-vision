@@ -188,6 +188,32 @@ public final class Pg {
             throw new RuntimeException("deleteDetection failed for id=" + detectionId, e);
         }
     }
+
+    /** Простая статистика по таблицам. */
+    public static long countVideos() {
+        return count("SELECT count(*) FROM videos");
+    }
+
+    public static long countDetections() {
+        return count("SELECT count(*) FROM detections");
+    }
+
+    public static long countEvents() {
+        return count("SELECT count(*) FROM events");
+    }
+
+    private static long count(String sql) {
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()
+        ) {
+            rs.next();
+            return rs.getLong(1);
+        } catch (SQLException e) {
+            throw new RuntimeException("count failed for: " + sql, e);
+        }
+    }
+
     public static void close() {
         System.out.println("[Pg] close(): заглушка");
     }
