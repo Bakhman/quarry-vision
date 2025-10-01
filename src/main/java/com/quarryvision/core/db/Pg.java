@@ -127,7 +127,7 @@ public final class Pg {
                        d.created_at
                 FROM detections d
                 JOIN videos v ON v.id = d.video_id
-                ORDERED BY d.id DESC
+                ORDER BY d.id DESC
                 LIMIT ?
                 """;
         try (Connection c = get();
@@ -158,7 +158,7 @@ public final class Pg {
         final String sql = """
                 SELECT t_ms
                 FROM events
-                WHERE detectionId = ?
+                WHERE detection_Id = ?
                 ORDER BY t_ms
                 """;
         try (Connection c = get();
