@@ -8,11 +8,9 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -216,5 +214,37 @@ public final class Pg {
 
     public static void close() {
         System.out.println("[Pg] close(): заглушка");
+    }
+
+    /** Агрегаты по дням за последние lastDays. */
+    public static List<DbDailyAgg> listDailyAgg(int lastDays) {
+        int days = Math.max(1, lastDays);
+        final String sql = """
+                SELECT date(created_at) AS d,
+                    count(*) AS det_cnt,
+                    coalesce(sum(events_count), 0) AS ev_cnt
+                FROM detections
+                WHERE created_at >= ?
+                GROUP BY d
+                ORDER BY d DESC
+                """;
+        Instant bound = Instant.now().minusSeconds(days * 86400L);
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)
+        ){
+            ps.setTimestamp(1, Timestamp.from(bound));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DbDailyAgg> out = new ArrayList<>();
+                while (rs.next()) {
+                    LocalDate day = rs.getObject(1, LocalDate.class);
+                    long det = rs.getLong(2);
+                    long ev = rs.getLong(3);
+                    out.add(new DbDailyAgg(day, det, ev));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("listDailyAgg failed", e);
+        }
     }
 }
