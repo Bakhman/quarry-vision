@@ -216,6 +216,38 @@ public final class Pg {
         System.out.println("[Pg] close(): заглушка");
     }
 
+    /** Агрегаты по видео, последние по активности. */
+    public static List<DbVideoAgg> listVideoAgg(int limit) {
+        final String sql = """
+                SELECT v.path,
+                    count(*) AS det_cnt,
+                    coalesce(sum(d.events_count),0) AS ev_cnt
+                FROM detections d
+                JOIN videos v ON v.id = d.video_id
+                GROUP BY v.path
+                ORDER BY max(d.created_at) DESC
+                LIMIT ?
+                """;
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)
+        ) {
+            ps.setInt(1, Math.max(1, limit));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DbVideoAgg> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new DbVideoAgg(
+                            rs.getString(1),
+                            rs.getLong(2),
+                            rs.getLong(3)
+                    ));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("listVideoAgg failed", e);
+        }
+    }
+
     /** Агрегаты по дням за последние lastDays. */
     public static List<DbDailyAgg> listDailyAgg(int lastDays) {
         int days = Math.max(1, lastDays);

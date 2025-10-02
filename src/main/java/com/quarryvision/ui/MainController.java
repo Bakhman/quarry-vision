@@ -2,6 +2,7 @@ package com.quarryvision.ui;
 
 import com.quarryvision.app.Config;
 import com.quarryvision.core.db.DbDailyAgg;
+import com.quarryvision.core.db.DbVideoAgg;
 import com.quarryvision.core.db.Pg;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
@@ -169,6 +170,7 @@ public class MainController {
         Button refresh = new Button("Refresh");
         Button showEv = new Button("Show events");
         Button del = new Button("Delete detection");
+
         // агрегаты за 30 дней
         TableView<DbDailyAgg> daily = new TableView<>();
         daily.setPrefHeight(200);
@@ -179,6 +181,17 @@ public class MainController {
         TableColumn<DbDailyAgg, String> cEv = new TableColumn<>("Events");
         cEv.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().events)));
         daily.getColumns().addAll(cDay, cDet, cEv);
+
+        // агрегаты по видео (топ-20 по недавней активности)
+        TableView<DbVideoAgg> byVideo = new TableView<>();
+        byVideo.setPrefHeight(220);
+        TableColumn<DbVideoAgg, String> vPath = new TableColumn<>("Video path");
+        vPath.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue().path));
+        TableColumn<DbVideoAgg, String> vDet = new TableColumn<>("Detections");
+        vDet.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().detections)));
+        TableColumn<DbVideoAgg, String> vEv = new TableColumn<>("Events");
+        vEv.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().events)));
+        byVideo.getColumns().addAll(vPath, vDet, vEv);
         TextArea evArea = new TextArea();
         evArea.setEditable(false);
         evArea.setPrefRowCount(10);
@@ -193,10 +206,12 @@ public class MainController {
                     long d = Pg.countDetections();
                     long ev = Pg.countEvents();
                     var agg = Pg.listDailyAgg(30);
+                    var top = Pg.listVideoAgg(20);
                     Platform.runLater(() -> {
                         list.getItems().setAll(rows);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                         daily.setItems(FXCollections.observableArrayList(agg));
+                        byVideo.setItems(FXCollections.observableArrayList(top));
                     });
                 } catch (Exception ex) {
                     Platform.runLater(() -> {
@@ -273,7 +288,7 @@ public class MainController {
             }
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, stats, daily, evArea);
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, stats, daily, byVideo, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // авто-подгрузка при открытии

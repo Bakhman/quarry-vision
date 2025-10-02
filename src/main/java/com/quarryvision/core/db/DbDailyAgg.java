@@ -2,7 +2,7 @@ package com.quarryvision.core.db;
 
 import java.time.LocalDate;
 
-public class DbDailyAgg {
+public final class DbDailyAgg {
     public final LocalDate day;
     public final long detections;
     public final long events;
