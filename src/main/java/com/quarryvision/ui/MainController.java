@@ -11,14 +11,21 @@ import com.quarryvision.core.detection.BucketDetector;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 
 
+import javax.imageio.IIOException;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -170,6 +177,7 @@ public class MainController {
         Button refresh = new Button("Refresh");
         Button showEv = new Button("Show events");
         Button del = new Button("Delete detection");
+        Button exportCsv = new Button("Export CSV");
 
         // агрегаты за 30 дней
         TableView<DbDailyAgg> daily = new TableView<>();
@@ -288,7 +296,61 @@ public class MainController {
             }
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, stats, daily, byVideo, evArea);
+        exportCsv.setOnAction(e -> {
+            exportCsv.setDisable(true);
+            exec.submit(() -> {
+               try {
+                   long v = Pg.countVideos();
+                   long d = Pg.countDetections();
+                   long ev = Pg.countEvents();
+                   var agg = Pg.listDailyAgg(365);
+                   var top = Pg.listVideoAgg(1000);
+                   StringBuilder sb = new StringBuilder();
+                   sb.append("Summary\n");
+                   sb.append("Videos,Detections,Events\n");
+                   sb.append(v).append(',').append(d).append(',').append(ev).append("\r\n\r\n");
+                   sb.append("Daily\n");
+                   sb.append("Day,Detections,Events\n");
+                   for (var a : agg) {
+                       sb.append(a.day).append(',').append(a.detections).append(',').append(a.events).append("\r\n");
+                   }
+                   sb.append("\r\nVideos\n");
+                   sb.append("Path,Detections,Events\n");
+                   for (var vrow : top) {
+                       // экранирование запятых
+                       String csvPath = "\"" + vrow.path.replace("\"", "\"\"") + "\"";
+                       sb.append(csvPath).append(',').append(vrow.detections).append(',').append(vrow.events).append("\r\n");
+                   }
+                   String content = sb.toString();
+                   Platform.runLater(() -> {
+                       try {
+                           FileChooser fc = new FileChooser();
+                           fc.setTitle("Save Reports CSV");
+                           fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV","*.csv"));
+                           String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+                           fc.setInitialFileName("qv-report-" + ts + ".csv");
+                           var win = rep.getScene() != null ? rep.getScene().getWindow() : null;
+                           var f = fc.showSaveDialog(win);
+                           if (f != null) {
+                               Files.writeString(f.toPath(), content, StandardCharsets.UTF_8);
+                               evArea.appendText("Exported CSV: " + f.getAbsolutePath() + "\n");
+                           }
+                       } catch (IOException io) {
+                           evArea.appendText("Export error: " + io + "\n");
+                       } finally {
+                           exportCsv.setDisable(false);
+                       }
+                   });
+               } catch (Exception ex) {
+                   Platform.runLater(() -> {
+                       evArea.appendText("Export error: " + ex + "\n");
+                       exportCsv.setDisable(false);
+                   });
+               }
+            });
+        });
+
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, exportCsv), list, stats, daily, byVideo, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // авто-подгрузка при открытии
