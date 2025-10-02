@@ -1,11 +1,14 @@
 package com.quarryvision.ui;
 
 import com.quarryvision.app.Config;
+import com.quarryvision.core.db.DbDailyAgg;
 import com.quarryvision.core.db.Pg;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.video.CameraWorker;
 import com.quarryvision.core.detection.BucketDetector;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
 import javafx.scene.layout.*;
 import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
@@ -166,6 +169,16 @@ public class MainController {
         Button refresh = new Button("Refresh");
         Button showEv = new Button("Show events");
         Button del = new Button("Delete detection");
+        // агрегаты за 30 дней
+        TableView<DbDailyAgg> daily = new TableView<>();
+        daily.setPrefHeight(200);
+        TableColumn<DbDailyAgg, String> cDay = new TableColumn<>("Day");
+        cDay.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue().day.toString()));
+        TableColumn<DbDailyAgg, String> cDet = new TableColumn<>("Detections");
+        cDet.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().detections)));
+        TableColumn<DbDailyAgg, String> cEv = new TableColumn<>("Events");
+        cEv.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().events)));
+        daily.getColumns().addAll(cDay, cDet, cEv);
         TextArea evArea = new TextArea();
         evArea.setEditable(false);
         evArea.setPrefRowCount(10);
@@ -179,9 +192,11 @@ public class MainController {
                     long v = Pg.countVideos();
                     long d = Pg.countDetections();
                     long ev = Pg.countEvents();
+                    var agg = Pg.listDailyAgg(30);
                     Platform.runLater(() -> {
                         list.getItems().setAll(rows);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
+                        daily.setItems(FXCollections.observableArrayList(agg));
                     });
                 } catch (Exception ex) {
                     Platform.runLater(() -> {
@@ -258,7 +273,7 @@ public class MainController {
             }
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, stats, evArea);
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del), list, stats, daily, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // авто-подгрузка при открытии
