@@ -1,5 +1,6 @@
 package com.quarryvision.core.db;
 
+
 public final class DbVideoAgg {
     public final String path;
     public final long detections;
