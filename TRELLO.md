@@ -1,6 +1,6 @@
 # Trello Snapshot
 **Board:** QuarryVision — учёт ковшей и рейсов
-**Updated:** 2025-09-23T13:07:39.943Z
+**Updated:** 2025-10-04T21:30:01.500Z
 
 ## List
 - [Эпик 2. Импорт и хранение видео]  — _updated 2025-08-17T10:03:27.304Z_
@@ -236,3 +236,39 @@
 - [[ ] build (pull_request) зелёный]  — _updated 2025-09-23T13:07:38.661Z_
 - [[ ] Trello Plan Apply/Sync расписание/права]  — _updated 2025-09-23T13:07:39.246Z_
 - [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-09-23T13:07:39.943Z_
+- [[ ] Идеи/заметки сюда]  — _updated 2025-10-04T21:29:52.435Z_
+- [[ ] OCR (Tess4J) — smoke-тест]  — _updated 2025-10-04T21:29:52.806Z_
+- [[ ] Persistence (Postgres) — миграции + запись]  — _updated 2025-10-04T21:29:53.171Z_
+- [[ ] UI (JavaFX) — старт/стоп + лог]  — _updated 2025-10-04T21:29:53.438Z_
+- [[ ] E2E связка + краткое демо (GIF/скрин)]  — _updated 2025-10-04T21:29:53.685Z_
+- [[ ] Очередь обработки (QueueService) — очередь видео, ProgressBar, Cancel]  — _updated 2025-10-04T21:29:53.897Z_
+- [[ ] Фильтр и пагинация в Reports (по дате, merge_ms, пути)]  — _updated 2025-10-04T21:29:54.105Z_
+- [[ ] Экспорт событий одной детекции (CSV)]  — _updated 2025-10-04T21:29:54.322Z_
+- [[ ] UI-улучшения и авто-refresh]  — _updated 2025-10-04T21:29:54.557Z_
+- [[ ] OCR-модуль (Tesseract) — распознавание номеров машин]  — _updated 2025-10-04T21:29:54.774Z_
+- [[ ] Charts (Recharts/FXChart) — графики активности камер]  — _updated 2025-10-04T21:29:55.010Z_
+- [[ ] Preferences UI — редактирование `application.yaml` без перезапуска]  — _updated 2025-10-04T21:29:55.230Z_
+- [[ ] Отчёты по рейсам (truck trips) — загрузки/выгрузки]  — _updated 2025-10-04T21:29:55.455Z_
+- [[ ] UI-рефакторинг и темы (адаптивная ширина)]  — _updated 2025-10-04T21:29:55.671Z_
+- [[ ] Detection (подсчёт ковшей) — заглушка + интерфейс]  — _updated 2025-10-04T21:29:56.023Z_
+- [[ ] Ruleset OK]  — _updated 2025-10-04T21:29:56.543Z_
+- [[ ] Auto-merge OK]  — _updated 2025-10-04T21:29:56.756Z_
+- [[ ] cleanup-guide.md + зачистка старых веток]  — _updated 2025-10-04T21:29:56.967Z_
+- [[ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`]  — _updated 2025-10-04T21:29:57.187Z_
+- [[ ] Ruleset: запрет push, required check `build`]  — _updated 2025-10-04T21:29:57.401Z_
+- [[ ] CI Badge/README финализировать]  — _updated 2025-10-04T21:29:57.617Z_
+- [[ ] Auto-merge (squash) проверить на тех-PR]  — _updated 2025-10-04T21:29:57.855Z_
+- [[ ] PR-templates / Issue-templates просмотреть]  — _updated 2025-10-04T21:29:58.074Z_
+- [[ ] Ingest (USB) — базовый поток]  — _updated 2025-10-04T21:29:58.302Z_
+- [[ ] `.gitignore`: исключить IDE/`target/`]  — _updated 2025-10-04T21:29:58.683Z_
+- [[ ] build (pull_request) зелёный]  — _updated 2025-10-04T21:29:58.915Z_
+- [[ ] Trello Plan Apply/Sync расписание/права]  — _updated 2025-10-04T21:29:59.162Z_
+- [[ ] Release workflow (GitHub Actions: build → artifact → release)]  — _updated 2025-10-04T21:29:59.403Z_
+- [[ ] Dockerfile + headless-режим (CLI-версия)]  — _updated 2025-10-04T21:29:59.633Z_
+- [[ ] Unit-тесты importer/queue]  — _updated 2025-10-04T21:29:59.860Z_
+- [[ ] Unit-тесты для `Pg`, `BucketDetector`]  — _updated 2025-10-04T21:30:00.083Z_
+- [[ ] Docs: базовый `user-guide.md`]  — _updated 2025-10-04T21:30:00.306Z_
+- [[ ] Docs: `developer-guide.md`, FAQ]  — _updated 2025-10-04T21:30:00.555Z_
+- [[ ] CodeQL / SpotBugs анализ]  — _updated 2025-10-04T21:30:00.822Z_
+- [[ ] Performance-tuning и профилирование]  — _updated 2025-10-04T21:30:01.072Z_
+- [[ ] Ingest → Detection → OCR → Persist → UI (end-to-end)]  — _updated 2025-10-04T21:30:01.500Z_
