@@ -2,6 +2,7 @@ package com.quarryvision.ui;
 
 import com.quarryvision.app.Config;
 import com.quarryvision.core.db.DbDailyAgg;
+import com.quarryvision.core.db.DbMergeAgg;
 import com.quarryvision.core.db.DbVideoAgg;
 import com.quarryvision.core.db.Pg;
 import com.quarryvision.core.importer.IngestProcessor;
@@ -16,6 +17,7 @@ import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import org.bytedeco.opencv.presets.opencv_core;
 
 
 import javax.imageio.IIOException;
@@ -200,6 +202,18 @@ public class MainController {
         TableColumn<DbVideoAgg, String> vEv = new TableColumn<>("Events");
         vEv.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().events)));
         byVideo.getColumns().addAll(vPath, vDet, vEv);
+
+        // агрегаты по merge_ms
+        TableView<DbMergeAgg> byMerge = new TableView<>();
+        byMerge.setPrefHeight(160);
+        TableColumn<DbMergeAgg, String> mVal = new TableColumn<>("merge_ms");
+        mVal.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Integer.toString(cd.getValue().mergeMs)));
+        TableColumn<DbMergeAgg, String> mDet = new TableColumn<>("Detections");
+        mDet.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().detections)));
+        TableColumn<DbMergeAgg, String> mEv = new TableColumn<>("Events");
+        mEv.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().events)));
+        byMerge.getColumns().addAll(mVal, mDet, mEv);
+
         TextArea evArea = new TextArea();
         evArea.setEditable(false);
         evArea.setPrefRowCount(10);
@@ -215,11 +229,13 @@ public class MainController {
                     long ev = Pg.countEvents();
                     var agg = Pg.listDailyAgg(30);
                     var top = Pg.listVideoAgg(20);
+                    var merges = Pg.listMergeAgg();
                     Platform.runLater(() -> {
                         list.getItems().setAll(rows);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                         daily.setItems(FXCollections.observableArrayList(agg));
                         byVideo.setItems(FXCollections.observableArrayList(top));
+                        byMerge.setItems(FXCollections.observableArrayList(merges));
                     });
                 } catch (Exception ex) {
                     Platform.runLater(() -> {
@@ -350,7 +366,7 @@ public class MainController {
             });
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, exportCsv), list, stats, daily, byVideo, evArea);
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, exportCsv), list, stats, daily, byVideo, byMerge, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // авто-подгрузка при открытии

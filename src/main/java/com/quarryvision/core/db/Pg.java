@@ -248,6 +248,34 @@ public final class Pg {
         }
     }
 
+    /** Агрегаты по merge_ms. */
+    public static List<DbMergeAgg> listMergeAgg() {
+        final String sql = """
+                SELECT merge_ms,
+                    count(*) AS det_cnt,
+                    coalesce(sum(events_count),0) AS ev_count
+                FROM detections
+                GROUP BY merge_ms
+                ORDER BY merge_ms
+                """;
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()
+        ){
+            List<DbMergeAgg> out =  new ArrayList<>();
+            while (rs.next()) {
+                out.add(new DbMergeAgg(
+                        rs.getInt(1),
+                        rs.getLong(2),
+                        rs.getLong(3)
+                ));
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new RuntimeException("listMergeAgg failed", e);
+        }
+    }
+
     /** Агрегаты по дням за последние lastDays. */
     public static List<DbDailyAgg> listDailyAgg(int lastDays) {
         int days = Math.max(1, lastDays);
