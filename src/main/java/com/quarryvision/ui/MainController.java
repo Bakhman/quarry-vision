@@ -1,16 +1,14 @@
 package com.quarryvision.ui;
 
 import com.quarryvision.app.Config;
-import com.quarryvision.core.db.DbDailyAgg;
-import com.quarryvision.core.db.DbMergeAgg;
-import com.quarryvision.core.db.DbVideoAgg;
-import com.quarryvision.core.db.Pg;
+import com.quarryvision.core.db.*;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.video.CameraWorker;
 import com.quarryvision.core.detection.BucketDetector;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
+import javafx.geometry.HPos;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import org.bytedeco.opencv.opencv_core.Size;
@@ -26,6 +24,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -368,6 +367,75 @@ public class MainController {
 
         rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, exportCsv), list, stats, daily, byVideo, byMerge, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
+
+        // --- Heatmap tab ---
+        VBox heatPane = new VBox(10);
+        heatPane.setPadding(new Insets(12));
+        Label heatHdr = new Label("Week heatmap (by Events)");
+        Button refreshHeat = new Button("Refresh");
+
+        TableView<DbWeekAgg> byWeek = new TableView<>();
+        byWeek.setPrefHeight(220);
+        TableColumn<DbWeekAgg, String> wDay = new TableColumn<>("Weekday");
+        wDay.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue().day.toString()));
+        TableColumn<DbWeekAgg, String> wDet = new TableColumn<>("Detections");
+        wDet.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().detections)));
+        TableColumn<DbWeekAgg, String> wEv = new TableColumn<>("Events");
+        wEv.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Long.toString(cd.getValue().events)));
+        byWeek.getColumns().addAll(wDay, wDet, wEv);
+
+        GridPane heat = new GridPane();
+        heat.setHgap(8);
+        heat.setVgap(4);
+        final Region[] bars = new Region[7];
+        final Label[] lbls = new Label[7];
+        for (int i = 0; i < 7; i++) {
+            Label d = new Label(DayOfWeek.of(i+1).toString());
+            Region bar = new Region();
+            bar.setMinHeight(18);
+            bar.setPrefHeight(18);
+            Label val = new Label("0");
+            bars[i] = bar;
+            lbls[i] = val;
+            heat.add(d, 0, i);
+            heat.add(bar, 1, i);
+            heat.add(val, 2, i);
+            GridPane.setHalignment(val, HPos.RIGHT);
+            bar.setStyle("-fx-background-color: rgb(230,230,230); -fx-border-color: #ccc; -fx-border-radius: 3; -fx-background-radius: 3;");
+        }
+
+        refreshHeat.setOnAction(e -> {
+            refreshHeat.setDisable(true);
+            exec.submit(() -> {
+                try {
+                    var week = Pg.listWeekAgg();
+                    Platform.runLater(() -> {
+                        byWeek.setItems(FXCollections.observableArrayList(week));
+                        long maxEv = week.stream().mapToLong(w -> w.events).max().orElse(1L);
+                        for(int i =0; i < 7; i++) {
+                            long evv = week.get(i).events;
+                            double r = maxEv == 0 ? 0.0 : (double) evv / (double) maxEv;
+                            int c = 230 - (int)Math.round(r * 180);
+                            int width = 40 + (int)Math.round(r * 240);
+                            bars[i].setPrefWidth(width);
+                            bars[i].setStyle(String.format("-fx-background-color: rgb(%d,%d,%d); -fx-border-color: #ccc; -fx-border-radius: 3; -fx-background-radius: 3;", c, 240 - (230-c)/2, 255));
+                            lbls[i].setText(Long.toString(evv));
+                        }
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                       evArea.appendText("Heatmap load error: " + ex + "\n");
+                    });
+                } finally {
+                    Platform.runLater(() -> refreshHeat.setDisable(false));
+                }
+            });
+        });
+
+        heatPane.getChildren().addAll(heatHdr, refreshHeat, heat, byWeek);
+        tabs.getTabs().add(new Tab("Heatmap", heatPane));
+        // авто-загрузка heatmap
+        Platform.runLater(refreshHeat::fire);
 
         // авто-подгрузка при открытии
         Platform.runLater(refresh::fire);
