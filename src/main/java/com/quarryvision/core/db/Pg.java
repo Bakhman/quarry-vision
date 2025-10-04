@@ -9,10 +9,7 @@ import org.slf4j.Logger;
 
 import java.nio.file.Path;
 import java.sql.*;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -214,6 +211,36 @@ public final class Pg {
 
     public static void close() {
         System.out.println("[Pg] close(): заглушка");
+    }
+
+    /** Агрегаты по дням недели (ISO: 1=MON..7=SUN). */
+    public static List<DbWeekAgg> listWeekAgg() {
+        final String sql = """
+                SELECT CAST(EXTRACT(ISODOW FROM created_at) AS int) AS dow,
+                    count(*) AS det_cnt,
+                    coalesce(sum(events_count),0) AS ev_cnt
+                FROM detections
+                GROUP BY dow
+                """;
+        long[] det = new long[8]; // 1..7
+        long[] ev  = new long[8];
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()
+        ) {
+            while (rs.next()) {
+                int dow  = rs.getInt(1);
+                det[dow] = rs.getLong(2);
+                ev[dow]  = rs.getLong(3);
+            }
+            List<DbWeekAgg> out = new ArrayList<>(7);
+            for (int i = 1; i <= 7; i++) {
+                out.add(new DbWeekAgg(DayOfWeek.of(i), det[i], ev[i]));
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new RuntimeException("listWeekAgg failed", e);
+        }
     }
 
     /** Агрегаты по видео, последние по активности. */
