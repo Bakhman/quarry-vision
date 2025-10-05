@@ -209,10 +209,6 @@ public final class Pg {
         }
     }
 
-    public static void close() {
-        System.out.println("[Pg] close(): заглушка");
-    }
-
     /** Агрегаты по дням недели (ISO: 1=MON..7=SUN). */
     public static List<DbWeekAgg> listWeekAgg() {
         final String sql = """
@@ -333,5 +329,30 @@ public final class Pg {
         } catch (SQLException e) {
             throw new RuntimeException("listDailyAgg failed", e);
         }
+    }
+
+    /** Путь к видео по detection_id. */
+    public static String findVideoPathByDetection(int detectionId) {
+        final String sql = """
+                SELECT v.path
+                FROM detections d
+                JOIN videos v ON v.id = d.video_id
+                WHERE d.id = ?
+                """;
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql);
+        ) {
+            ps.setInt(1 , detectionId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getString(1);
+                return null;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("findVideoPathByDetection failed for id=" + detectionId,  e);
+        }
+    }
+
+    public static void close() {
+        System.out.println("[Pg] close(): заглушка");
     }
 }

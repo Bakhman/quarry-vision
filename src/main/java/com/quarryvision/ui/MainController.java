@@ -9,6 +9,10 @@ import com.quarryvision.core.detection.BucketDetector;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.HPos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import org.bytedeco.opencv.opencv_core.Size;
@@ -19,6 +23,8 @@ import org.bytedeco.opencv.presets.opencv_core;
 
 
 import javax.imageio.IIOException;
+import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -178,6 +184,7 @@ public class MainController {
         Button refresh = new Button("Refresh");
         Button showEv = new Button("Show events");
         Button del = new Button("Delete detection");
+        Button openFolder = new Button("Open video folder");
         Button exportCsv = new Button("Export CSV");
 
         // агрегаты за 30 дней
@@ -365,7 +372,69 @@ public class MainController {
             });
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, exportCsv), list, stats, daily, byVideo, byMerge, evArea);
+        openFolder.setOnAction(e -> {
+            String sel = list.getSelectionModel().getSelectedItem();
+            if (sel == null || sel.isBlank()) return;
+            int hash = sel.indexOf('#');
+            int sp = sel.indexOf(' ');
+            if (hash != -1 && sp > hash) {
+                try {
+                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
+                    openFolder.setDisable(true);
+                    exec.submit(() -> {
+                        try {
+                            String p = Pg.findVideoPathByDetection(detId);
+                            if (p == null || p.isBlank()) {
+                                Platform.runLater(() -> evArea.appendText("Path not found for detection #" + detId + "\n"));
+                                return;
+                            }
+                            File f = new File(p);
+                            File dir = f.getParentFile() != null ? f.getParentFile() : f;
+                            String os = System.getProperty("os.name", "").toLowerCase();
+                            boolean handled = false;
+                            // Windows: открыть проводник и подсветить файл если есть
+                            if (os.contains("win")) {
+                                if (f.isFile()) {
+                                    new ProcessBuilder("explorer", "/select,", f.getAbsolutePath()).start();
+                                } else {
+                                    new ProcessBuilder("explorer", dir.getAbsolutePath()).start();
+                                }
+                                handled = true;
+                            }
+                            // macOS: показать в Finder
+                            if (!handled && os.contains("mac")) {
+                                if (f.isFile()) {
+                                    new ProcessBuilder("open", "-R", f.getAbsolutePath()).start();
+                                } else {
+                                    new ProcessBuilder("open", dir.getAbsolutePath()).start();
+                                }
+                                handled = true;
+                            }
+                            // Linux/прочее: Desktop.open папки
+                            if(!handled) {
+                                if (Desktop.isDesktopSupported()) {
+                                    Desktop.getDesktop().open(dir);
+                                    handled = true;
+                                }
+                            }
+                            if (handled) {
+                                Platform.runLater(() -> evArea.appendText("Opened: " + dir.getAbsolutePath() + "\n"));
+                            } else {
+                                Platform.runLater(() -> evArea.appendText("Open folder not supported on this platform\n"));
+                            }
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> evArea.appendText("Open folder error: " + ex + "\n"));
+                        } finally {
+                            Platform.runLater(() -> openFolder.setDisable(false));
+                        }
+                    });
+                } catch (NumberFormatException ignore) {
+                    /* no-op */
+                }
+            }
+        });
+
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, openFolder, exportCsv), list, stats, daily, byVideo, byMerge, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // --- Heatmap tab ---
