@@ -6,8 +6,11 @@ import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.video.CameraWorker;
 import com.quarryvision.core.detection.BucketDetector;
+import javafx.beans.Observable;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.HPos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -181,6 +184,8 @@ public class MainController {
         Label hdr = new Label("Detections history");
         ListView<String> list = new ListView<>();
         list.setPrefHeight(260);
+        TextField filterText = new TextField();
+        filterText.setPromptText("Filter: id, path, merge, date... (Ctrl+F)");
         Button refresh = new Button("Refresh");
         Button showEv = new Button("Show events");
         Button del = new Button("Delete detection");
@@ -224,6 +229,27 @@ public class MainController {
         evArea.setEditable(false);
         evArea.setPrefRowCount(10);
         Label stats = new Label(); // Videos | Detections | Events
+
+        // список и фильтрация
+        final ObservableList<String> master = FXCollections.observableArrayList();
+        final FilteredList<String> filtered = new FilteredList<>(master, s -> true);
+        list.setItems(filtered);
+
+        filterText.textProperty().addListener((obs, o, n) -> {
+            String query = n ==null ? "" : n.trim().toLowerCase();
+            if (query.isEmpty()) {
+                filtered.setPredicate(s -> true);
+            } else {
+                filtered.setPredicate(s -> s.toLowerCase().contains(query));
+            }
+        });
+
+        // Ctrl+F фокус в фильтре
+        rep.setOnKeyPressed(k -> {
+            switch (k.getCode()) {
+                case F: if (k.isControlDown()) filterText.requestFocus(); break;
+            }
+        });
         refresh.setOnAction(e -> {
             refresh.setDisable(true);
             evArea.clear();
@@ -237,7 +263,7 @@ public class MainController {
                     var top = Pg.listVideoAgg(20);
                     var merges = Pg.listMergeAgg();
                     Platform.runLater(() -> {
-                        list.getItems().setAll(rows);
+                        master.setAll(rows);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                         daily.setItems(FXCollections.observableArrayList(agg));
                         byVideo.setItems(FXCollections.observableArrayList(top));
@@ -434,7 +460,8 @@ public class MainController {
             }
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, openFolder, exportCsv), list, stats, daily, byVideo, byMerge, evArea);
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, openFolder, exportCsv),
+                filterText, list, stats, daily, byVideo, byMerge, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // --- Heatmap tab ---
