@@ -191,6 +191,7 @@ public class MainController {
         Button del = new Button("Delete detection");
         Button openFolder = new Button("Open video folder");
         Button exportCsv = new Button("Export CSV");
+        Button exportEvents = new Button("Export events");
 
         // агрегаты за 30 дней
         TableView<DbDailyAgg> daily = new TableView<>();
@@ -460,7 +461,61 @@ public class MainController {
             }
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, openFolder, exportCsv),
+        exportEvents.setOnAction(e -> {
+            String sel = list.getSelectionModel().getSelectedItem();
+            if (sel == null || sel.isBlank()) return;
+            int hash = sel.indexOf('#');
+            int sp = sel.indexOf(' ');
+            if (hash != -1 && sp > hash) {
+                try {
+                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
+                    exportEvents.setDisable(true);
+                    exec.submit(() -> {
+                        try {
+                            var stamps = Pg.listEventsMs(detId);
+                            String vpath = Pg.findVideoPathByDetection(detId);
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("Detection,").append(detId).append("\r\n");
+                            if (vpath != null) sb.append("Video,\"").append(vpath.replace("\"","\"\"")).append("\"\r\n");
+                            sb.append("\r\n#;t_ms;time\n");
+                            for (int i =0; i < stamps.size(); i++) {
+                                long t = stamps.get(i);
+                                sb.append(i + 1).append(';').append(t).append(';').append(fmtMs(t)).append("\r\n");
+                            }
+                            String content = sb.toString();
+                            Platform.runLater(() -> {
+                                try {
+                                    FileChooser fc = new FileChooser();
+                                    fc.setTitle("Save Events CSV");
+                                    fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
+                                    String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+                                    fc.setInitialFileName("qv-events-" + detId + "-" + ts + ".csv");
+                                    var win = rep.getScene() != null ? rep.getScene().getWindow() : null;
+                                    var f = fc.showSaveDialog(win);
+                                    if (f != null) {
+                                        Files.writeString(f.toPath(), content, StandardCharsets.UTF_8);
+                                        evArea.appendText("Exported events CSV: " + f.getAbsolutePath() + "\n");
+                                    } else {
+                                        evArea.appendText("Export canceled\n");
+                                    }
+                                } catch (IOException io) {
+                                    evArea.appendText("Export error: " + io + "\n");
+                                } finally {
+                                    exportEvents.setDisable(false);
+                                }
+                            });
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> {
+                                evArea.appendText("Export error: " + ex + "\n");
+                                exportEvents.setDisable(false);
+                            });
+                        }
+                    });
+                } catch (NumberFormatException ignore) { /* no-op */}
+            }
+        });
+
+        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, openFolder, exportCsv, exportEvents),
                 filterText, list, stats, daily, byVideo, byMerge, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
