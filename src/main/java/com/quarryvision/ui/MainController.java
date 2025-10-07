@@ -192,6 +192,12 @@ public class MainController {
         Button openFolder = new Button("Open video folder");
         Button exportCsv = new Button("Export CSV");
         Button exportEvents = new Button("Export events");
+        // пагинация
+        Button prev = new Button("Prev");
+        Button next = new Button("Next");
+        TextField pageSizeTf = new TextField("50");
+        pageSizeTf.setPrefWidth(60);
+        Label pageInfo = new Label();
 
         // агрегаты за 30 дней
         TableView<DbDailyAgg> daily = new TableView<>();
@@ -251,21 +257,48 @@ public class MainController {
                 case F: if (k.isControlDown()) filterText.requestFocus(); break;
             }
         });
-        refresh.setOnAction(e -> {
+        // состояние пагинации
+        final int[] page = {0};
+        final int[] pageSize = {50};
+
+        Runnable loadPage = () -> {
             refresh.setDisable(true);
             evArea.clear();
             exec.submit(() -> {
+                int sz;
                 try {
-                    List<String> rows = Pg.listRecentDetections(50);
-                    long v = Pg.countVideos();
-                    long d = Pg.countDetections();
-                    long ev = Pg.countEvents();
-                    var agg = Pg.listDailyAgg(30);
-                    var top = Pg.listVideoAgg(20);
-                    var merges = Pg.listMergeAgg();
+                    sz = Math.max(1, Integer.parseInt(pageSizeTf.getText().trim()));
+                } catch (Exception ignore) {
+                    sz = pageSize[0]; pageSizeTf.setText(Integer.toString(sz));
+                }
+                pageSize[0] = sz;
+                int offset = page[0] * pageSize[0];
+                List<String> rows = Pg.listRecentDetections(pageSize[0], offset);
+                try {
+                    if (rows.isEmpty() && page[0] > 0) {
+                    // откат на предыдущую страницу
+                    page[0]--;
+                    offset = page[0] * pageSize[0];
+                    rows = Pg.listRecentDetections(pageSize[0], page[0] * pageSize[0]);
+                    }
+                    // offset ТОЛЬКО внутри этой лямбды
+                    final int effectiveOffset = offset;
+                    final List<String> pageRows = rows; // <— финализируем для lambda
+                    final long v = Pg.countVideos();
+                    final long d = Pg.countDetections();
+                    final long ev = Pg.countEvents();
+                    final var agg = Pg.listDailyAgg(30);
+                    final var top = Pg.listVideoAgg(20);
+                    final var merges = Pg.listMergeAgg();
+
                     Platform.runLater(() -> {
-                        master.setAll(rows);
+                        master.setAll(pageRows);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
+                        int from = pageRows.isEmpty() ? 0 : effectiveOffset + 1;
+                        int to = effectiveOffset + pageRows.size();
+                        pageInfo.setText("Showing " + from + "-" + to + " of " + d);
+                        prev.setDisable(page[0] == 0);
+                        next.setDisable(to >= d);
                         daily.setItems(FXCollections.observableArrayList(agg));
                         byVideo.setItems(FXCollections.observableArrayList(top));
                         byMerge.setItems(FXCollections.observableArrayList(merges));
@@ -278,7 +311,29 @@ public class MainController {
                     Platform.runLater(() -> refresh.setDisable(false));
                 }
             });
+        };
+
+        refresh.setOnAction(e -> {
+            page[0] = 0;
+            loadPage.run();
         });
+        prev.setOnAction(e -> {
+            if (page[0] > 0) {
+                page[0]--;
+                loadPage.run();
+            }
+        });
+        next.setOnAction(e -> {
+            page[0]++;
+            loadPage.run();
+        });
+        pageSizeTf.setOnAction(e -> {
+            page[0] = 0;
+            loadPage.run();
+        });
+
+        // авто-подгрузка при открытии
+        Platform.runLater(() -> loadPage.run());
 
         showEv.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
@@ -515,9 +570,15 @@ public class MainController {
             }
         });
 
-        rep.getChildren().addAll(hdr, new HBox(8, refresh, showEv, del, openFolder, exportCsv, exportEvents),
+        rep.getChildren().addAll(
+                hdr,
+                new HBox(8, refresh, showEv, del, openFolder, exportCsv, exportEvents),
+                new HBox(8, new Label("Page size:"), pageSizeTf, prev, next, pageInfo),
                 filterText, list, stats, daily, byVideo, byMerge, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
+
+        // авто-подгрузка при открытии
+        Platform.runLater(refresh::fire);
 
         // --- Heatmap tab ---
         VBox heatPane = new VBox(10);
@@ -587,9 +648,6 @@ public class MainController {
         tabs.getTabs().add(new Tab("Heatmap", heatPane));
         // авто-загрузка heatmap
         Platform.runLater(refreshHeat::fire);
-
-        // авто-подгрузка при открытии
-        Platform.runLater(refresh::fire);
 
         // Cameras (stubs)
         GridPane cams = new GridPane();
