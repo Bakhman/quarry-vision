@@ -4,9 +4,11 @@ import com.quarryvision.app.Config;
 import com.quarryvision.core.db.*;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
+import com.quarryvision.core.queue.DetectionQueueService;
+import com.quarryvision.core.queue.QueueTask;
 import com.quarryvision.core.video.CameraWorker;
 import com.quarryvision.core.detection.BucketDetector;
-import javafx.beans.Observable;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -22,14 +24,11 @@ import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
-import org.bytedeco.opencv.presets.opencv_core;
 
 
-import javax.imageio.IIOException;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -169,13 +168,113 @@ public class MainController {
         });
         importBox.getChildren().addAll(new Separator(), new Label("Detect video"), detectPath, detectBtn);
 
-        // Queue
+        // Queue — рабочая вкладка очереди обработки
+        // Назначение: управлять обработкой видео в одном фоновом потоке,
+        // видеть статус и прогресс. Сейчас процессор — симулятор (10 шагов по 10%).
+        // Далее подменим на реальную детекцию + запись в БД.
         VBox q = new VBox(10);
         q.setPadding(new Insets(12));
-        ProgressBar pb = new ProgressBar(0);
-        Button sim = new Button("Симуляция очереди");
-        sim.setOnAction(e -> pb.setProgress(Math.min(1.0, pb.getProgress()+0.1)));
-        q.getChildren().addAll(pb, sim);
+        Label qHdr = new Label("Processing queue");
+        Button qAdd = new Button("Add videos");
+        Button qStart = new Button("Start");
+        Button qStop = new Button("Stop");
+        Button qCancel = new Button("Cancel selected");
+        Button qClear = new Button("Clear finished");
+        TextArea qLog = new TextArea();
+        qLog.setEditable(false);
+        qLog.setPrefRowCount(8);
+
+        // Очередь: движок и модель задачи
+        DetectionQueueService queue = new DetectionQueueService();
+
+        // Таблица задач: id | path | status | progress
+        TableView<QueueTask> qTable = new TableView<>();
+        qTable.setPrefHeight(260);
+        TableColumn<QueueTask, String> qcId = new TableColumn<>("ID");
+        qcId.setCellValueFactory(c -> new ReadOnlyStringWrapper(Integer.toString(c.getValue().id)));
+        TableColumn<QueueTask, String> qcPath = new TableColumn<>("Video");
+        qcPath.setCellValueFactory(c -> new ReadOnlyStringWrapper(
+                c.getValue().video != null ? c.getValue().toString() : ""));
+        TableColumn<QueueTask, String> qcStatus = new TableColumn<>("Status");
+        qcStatus.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().status.toString()));
+        TableColumn<QueueTask, ProgressBar> qcProg = new TableColumn<>("Progress");
+        qcProg.setCellValueFactory(c -> {
+            ProgressBar bar = new ProgressBar();
+            bar.setPrefWidth(120);
+            bar.setProgress(Math.max(0, Math.min(100, c.getValue().progress)) / 100.0);
+            return new ReadOnlyObjectWrapper<>(bar);
+        });
+        qTable.getColumns().addAll(qcId, qcPath, qcStatus, qcProg);
+
+        // Данные таблицы (перерисовываем по событиям очереди)
+        var qItems = FXCollections.<QueueTask>observableArrayList();
+        qTable.setItems(qItems);
+
+        // Подписка: любое изменение задачи → обновление UI
+        queue.addListener(task -> Platform.runLater(() -> {
+            if (!qItems.contains(task)) qItems.add(task);
+            qTable.refresh();
+            qLog.appendText("Task #" + task.id + " " + task.status + " " + task.progress + "% " + task.message + "\n");
+        }));
+
+        // Добавить видео
+        qAdd.setOnAction(e -> {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Chose videos");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Videos", "*.mp4", "*.avi", "*.*"));
+            var win = q.getScene() != null ? q.getScene().getWindow() : null;
+            var files = fc.showOpenMultipleDialog(win);
+            if (files != null) {
+                for (var f : files) {
+                    var t = queue.enqueue(Path.of(f.getAbsolutePath()));
+                    qItems.add(t);
+                }
+                qTable.refresh();
+            }
+        });
+
+        // Старт: симулятор на 2 секунды/задачу (10×200ms)
+        qStart.setOnAction(e -> {
+            DetectionQueueService.Processor simulator = (video, onProgress) -> {
+                for (int i = 1; i <= 10; i++) {
+                    Thread.sleep(200);
+                    onProgress.accept(i * 10);
+                }
+            };
+            queue.start(simulator);
+            qLog.appendText("Queue started\n");
+        });
+
+        // Мягкая остановка после текущей задачи
+        qStop.setOnAction(e -> {
+            queue.stop();
+            qLog.appendText("Queue stop requested\n");
+        });
+
+        // Отмена выбранной (если ещё не RUNNING)
+        qCancel.setOnAction(e -> {
+            var sel = qTable.getSelectionModel().getSelectedItem();
+            if (sel == null) return;
+            boolean ok = queue.cancel(sel);
+            qLog.appendText(ok ? ("Canceled #" + sel.id + "\n") : ("Cannot cancel #" + sel.id +"\n"));
+            qTable.refresh();
+        });
+
+        // Очистить завершённые (DONE/FAILED/CANCELED)
+        qClear.setOnAction(e -> {
+            qItems.removeIf(t ->
+                    switch (t.status) {
+                        case DONE, FAILED, CANCELED -> true;
+                        default -> false;
+            });
+            qTable.refresh();
+        });
+
+        q.getChildren().addAll(
+                qHdr,
+                new HBox(8, qAdd, qStart, qStop, qCancel, qClear),
+                qTable, qLog
+        );
         tabs.getTabs().add(new Tab("Queue", q));
 
         // Reports
