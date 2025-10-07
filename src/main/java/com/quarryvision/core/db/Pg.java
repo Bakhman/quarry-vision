@@ -114,6 +114,11 @@ public final class Pg {
 
     /** Последние детекции: "#<id> | <events> ev | merge=<ms> | <YYYY-MM-DD HH:MM> | <path>" */
     public static List<String> listRecentDetections(int limit) {
+        return listRecentDetections(limit, 0);
+    }
+
+    /** Последние детекции с пагинацией. */
+    public static List<String> listRecentDetections(int limit, int offset) {
         final String sql = """
                 SELECT d.id,
                        v.path,
@@ -123,12 +128,13 @@ public final class Pg {
                 FROM detections d
                 JOIN videos v ON v.id = d.video_id
                 ORDER BY d.id DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """;
         try (Connection c = get();
              PreparedStatement ps = c.prepareStatement(sql)
         ) {
             ps.setInt(1, Math.max(1, limit));
+            ps.setInt(2, Math.max(0, offset));
             try (ResultSet rs = ps.executeQuery()) {
                 List<String> out = new ArrayList<>();
                 while (rs.next()) {
