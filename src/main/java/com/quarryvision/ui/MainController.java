@@ -2,6 +2,7 @@ package com.quarryvision.ui;
 
 import com.quarryvision.app.Config;
 import com.quarryvision.core.db.*;
+import com.quarryvision.core.detection.DetectionResult;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.queue.DetectionQueueService;
@@ -33,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -44,7 +46,7 @@ public class MainController {
     private final BorderPane root = new BorderPane();
     private final ExecutorService exec = Executors.newFixedThreadPool(4);
     private final Config cfg = Config.load();
-
+    private Button refreshBtn;
     public MainController() {
         TabPane tabs = new TabPane();
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -233,15 +235,37 @@ public class MainController {
             }
         });
 
-        // Старт: симулятор на 2 секунды/задачу (10×200ms)
+        // Старт: реальная обработка — детектор + запись результата в БД
         qStart.setOnAction(e -> {
-            DetectionQueueService.Processor simulator = (video, onProgress) -> {
-                for (int i = 1; i <= 10; i++) {
-                    Thread.sleep(200);
-                    onProgress.accept(i * 10);
-                }
-            };
-            queue.start(simulator);
+            // Processor вызывается воркером для каждого видео из очереди.
+            DetectionQueueService.Processor processor = ((video, onProgress) -> {
+                // 1) Создаём/обновляем запись о видео. fps/frames временно 0.
+                onProgress.accept(5);
+                int videoId = Pg.upsertVideo(video, 0., 0L);
+                onProgress.accept(10);
+
+                // 2) Детектор из application.yaml (+ учёт -Dqv.mergeMs).
+                var cfg = Config.load();
+                BucketDetector det = new BucketDetector(cfg);
+
+                // 3) Детекция. Предполагается detect(Path) → List<Instant>.
+                // Если у тебя сигнатура иная, замени строку ниже на актуальную.
+                List<Instant> stamps = det.detect(video).timestampsMs();
+                onProgress.accept(70);
+
+                // 4) Запись результата в БД.
+                int mergeMs = Integer.getInteger("qv.mergeMs", cfg.detection().mergeMs());
+                int detId = Pg.insertDetection(videoId, mergeMs, stamps);
+                onProgress.accept(95);
+
+                // 5) Лог + обновление Reports
+                onProgress.accept(100);
+                Platform.runLater(() -> {
+                    qLog.appendText("Saved detection #" + detId + " videoId=" + videoId + "events=" + stamps.size() + "\n");
+                    if (refreshBtn != null) refreshBtn.fire();
+                });
+            });
+            queue.start(processor);
             qLog.appendText("Queue started\n");
         });
 
@@ -285,12 +309,13 @@ public class MainController {
         list.setPrefHeight(260);
         TextField filterText = new TextField();
         filterText.setPromptText("Filter: id, path, merge, date... (Ctrl+F)");
-        Button refresh = new Button("Refresh");
+        refreshBtn = new Button("Refresh");
         Button showEv = new Button("Show events");
         Button del = new Button("Delete detection");
         Button openFolder = new Button("Open video folder");
         Button exportCsv = new Button("Export CSV");
         Button exportEvents = new Button("Export events");
+
         // пагинация
         Button prev = new Button("Prev");
         Button next = new Button("Next");
@@ -361,7 +386,7 @@ public class MainController {
         final int[] pageSize = {50};
 
         Runnable loadPage = () -> {
-            refresh.setDisable(true);
+            refreshBtn.setDisable(true);
             evArea.clear();
             exec.submit(() -> {
                 int sz;
@@ -407,12 +432,12 @@ public class MainController {
                         evArea.appendText("Load error: " + ex + "\n");
                     });
                 } finally {
-                    Platform.runLater(() -> refresh.setDisable(false));
+                    Platform.runLater(() -> refreshBtn.setDisable(false));
                 }
             });
         };
 
-        refresh.setOnAction(e -> {
+        refreshBtn.setOnAction(e -> {
             page[0] = 0;
             loadPage.run();
         });
@@ -671,13 +696,13 @@ public class MainController {
 
         rep.getChildren().addAll(
                 hdr,
-                new HBox(8, refresh, showEv, del, openFolder, exportCsv, exportEvents),
+                new HBox(8, refreshBtn, showEv, del, openFolder, exportCsv, exportEvents),
                 new HBox(8, new Label("Page size:"), pageSizeTf, prev, next, pageInfo),
                 filterText, list, stats, daily, byVideo, byMerge, evArea);
         tabs.getTabs().add(new Tab("Reports", rep));
 
         // авто-подгрузка при открытии
-        Platform.runLater(refresh::fire);
+        Platform.runLater(refreshBtn::fire);
 
         // --- Heatmap tab ---
         VBox heatPane = new VBox(10);
