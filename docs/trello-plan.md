@@ -22,10 +22,10 @@
 - [ ] Detection (подсчёт ковшей) — заглушка + интерфейс
 
 ## 🔍 Review
-
+- [ ] Ruleset OK
 
 ## ✅ Done
-- [ ] Ruleset OK
+
 - [ ] Auto-merge OK
 - [ ] cleanup-guide.md + зачистка старых веток
 - [ ] Docs: `CONTRIBUTING.md`, `branch-naming.md`, `pr-checklist.md`
