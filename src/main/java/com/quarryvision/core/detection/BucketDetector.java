@@ -1,6 +1,6 @@
 package com.quarryvision.core.detection;
 
-import javafx.scene.effect.GaussianBlur;
+import com.quarryvision.app.Config;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Size;
 import org.bytedeco.opencv.global.opencv_imgproc;
@@ -45,7 +45,35 @@ public final class BucketDetector {
         this.minChangedPixels = Math.max(0, minChangedPixels);
         this.morphKernel = (morphKernel == null ? new Size(3, 3) : morphKernel);
         this.mergeMs = Math.max(0, mergeMs);
+    }
 
+    /** Удобный конструктор: параметры из application.yaml (+ учёт -Dqv.mergeMs). */
+    public BucketDetector(Config cfgg) {
+        var d= cfgg.detection();
+        int stepFrames = d.stepFrames();
+        int diffThreshold = d.diffThreshold();
+        double eventRatio = d.eventRatio();
+        int cooldownFrames = d.cooldownFrames();
+        int minChangedPix = d.minChangedPixels();
+        // morphKernel: { w, h } → Size(w,h); безопасные дефолты 3×3
+        int kw = 3, kh = 3;
+        try {
+            kw = Math.max(1, d.morphW());
+            kh = Math.max(1, d.morphH());
+        } catch (Throwable ignore) {/* оставим 3x3, если поле отсутствует */}
+        Size kernel = new Size(kw, kh);
+        // mergeMs: системное свойство приоритетнее YAML
+        int mergeMs = Integer.getInteger("qv.mergeMs", d.mergeMs());
+        // делегируем на основной конструктор
+        // minChangedPix уже «порог изменившихся пикселей», kernel — морфология.
+        // mergeMs — окно слияния событий.
+        this.stepFrames = Math.max(1, stepFrames);
+        this.diffThreshold = Math.max(1,diffThreshold);
+        this.eventRatio = Math.max(1e-4, eventRatio);
+        this.cooldownFrames = Math.max(0, cooldownFrames);
+        this.minChangedPixels = Math.max(0, minChangedPix);
+        this.morphKernel = kernel;
+        this.mergeMs = Math.max(0, mergeMs);
     }
 
     private static List<Instant> mergeClose(List<Instant> src, long mergeMs) {
