@@ -48,13 +48,13 @@ public final class BucketDetector {
     }
 
     /** Удобный конструктор: параметры из application.yaml (+ учёт -Dqv.mergeMs). */
-    public BucketDetector(Config cfgg) {
-        var d= cfgg.detection();
+    public BucketDetector(Config cfg) {
+        var d= cfg.detection();
         int stepFrames = d.stepFrames();
         int diffThreshold = d.diffThreshold();
         double eventRatio = d.eventRatio();
         int cooldownFrames = d.cooldownFrames();
-        int minChangedPix = d.minChangedPixels();
+        int minChangedPixels = d.minChangedPixels();
         // morphKernel: { w, h } → Size(w,h); безопасные дефолты 3×3
         int kw = 3, kh = 3;
         try {
@@ -71,7 +71,7 @@ public final class BucketDetector {
         this.diffThreshold = Math.max(1,diffThreshold);
         this.eventRatio = Math.max(1e-4, eventRatio);
         this.cooldownFrames = Math.max(0, cooldownFrames);
-        this.minChangedPixels = Math.max(0, minChangedPix);
+        this.minChangedPixels = Math.max(0, minChangedPixels);
         this.morphKernel = kernel;
         this.mergeMs = Math.max(0, mergeMs);
     }
