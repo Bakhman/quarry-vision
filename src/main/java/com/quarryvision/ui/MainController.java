@@ -239,29 +239,34 @@ public class MainController {
         qStart.setOnAction(e -> {
             // Processor вызывается воркером для каждого видео из очереди.
             DetectionQueueService.Processor processor = ((video, onProgress) -> {
-                // 1) Создаём/обновляем запись о видео. fps/frames временно 0.
-                onProgress.accept(5);
-                int videoId = Pg.upsertVideo(video, 0., 0L);
-                onProgress.accept(10);
-
-                // 2) Детектор из application.yaml (+ учёт -Dqv.mergeMs).
+                // 1) Загружаем конфиг и создаём детектор
                 var cfg = Config.load();
                 BucketDetector det = new BucketDetector(cfg);
 
-                // 3) Детекция. Предполагается detect(Path) → List<Instant>.
-                // Если у тебя сигнатура иная, замени строку ниже на актуальную.
-                List<Instant> stamps = det.detect(video).timestampsMs();
+                // 2) Запускаем детекцию
+                onProgress.accept(10);
+                DetectionResult dr = det.detect(video);
                 onProgress.accept(70);
 
-                // 4) Запись результата в БД.
-                int mergeMs = Integer.getInteger("qv.mergeMs", cfg.detection().mergeMs());
-                int detId = Pg.insertDetection(videoId, mergeMs, stamps);
-                onProgress.accept(95);
+                // 3) Создаём/обновляем запись видео с реальными fps и frames
+                int videoId = Pg.upsertVideo(video, dr.fps(), dr.frames());
+                onProgress.accept(85);
 
-                // 5) Лог + обновление Reports
+                // 4) mergeMs — с учётом системного свойства (-Dqv.mergeMs)
+                int mergeMs = Integer.getInteger("qv.mergeMs", cfg.detection().mergeMs());
+
+                // 5) Сохраняем детекцию и события
+                int detId = Pg.insertDetection(videoId, mergeMs, dr.timestampsMs());
                 onProgress.accept(100);
+
+                // 6) Обновляем лог и Reports
                 Platform.runLater(() -> {
-                    qLog.appendText("Saved detection #" + detId + " videoId=" + videoId + "events=" + stamps.size() + "\n");
+                    qLog.appendText(
+                            "Saved detection #" + detId +
+                            " videoId=" + videoId +
+                            " events=" + dr.events() +
+                            " fps=" + dr.fps() +
+                            " frames=" +dr.frames() + "\n");
                     if (refreshBtn != null) refreshBtn.fire();
                 });
             });
@@ -505,7 +510,7 @@ public class MainController {
                             long d = Pg.countDetections();
                             long ev = Pg.countEvents();
                             Platform.runLater(() -> {
-                                list.getItems().setAll(rows);
+                                master.setAll(rows);
                                 stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                                 evArea.clear();
                                 evArea.appendText("Deleted detection #" + detId + "\n");
@@ -520,7 +525,7 @@ public class MainController {
                             });
                         }
                     });
-                } catch (NumberFormatException ignore) {/* no-op */}
+                } catch (NumberFormatException ignore) { /* no-op */ }
             }
         });
 
