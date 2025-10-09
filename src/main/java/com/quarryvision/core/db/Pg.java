@@ -358,6 +358,70 @@ public final class Pg {
         }
     }
 
+    // список камер
+    public static List<DbCamera> listCameras() {
+        final String sql = "SELECT id,name,url,active FROM cameras ORDER BY id";
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()
+        ) {
+            List<DbCamera> out = new ArrayList<>();
+            while (rs.next()) {
+                out.add(new DbCamera(
+                        rs.getInt(1),
+                        rs.getString(2),
+                        rs.getString(3),
+                        rs.getBoolean(4)));
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new RuntimeException("listCameras failed", e);
+        }
+    }
+    // добавить камеру
+    public static int insertCamera(String name, String url, boolean active) {
+        final String sql = "INSERT INTO cameras(name,url,active) values(?,?,?) RETURNING id";
+        try (Connection c = get();
+            PreparedStatement ps = c.prepareStatement(sql);
+        ) {
+            ps.setString(1, name);
+            ps.setString(2, url);
+            ps.setBoolean(3, active);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return  rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("insertCamera failed", e);
+        }
+    }
+    // удалить
+    public static void deleteCamera(int id) {
+        final String sql = "DELETE FROM cameras WHERE id=?";
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)
+        ) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("deleteCamera failed id=" + id, e);
+        }
+    }
+    // toggle active
+    public static void setCameraActive(int id, boolean active) {
+        final String sql = "UPDATE cameras SET active=? WHERE id=?";
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql);
+        ) {
+            ps.setBoolean(1, active);
+            ps.setInt(2, id);
+            int n = ps.executeUpdate();
+            if (n != 1) log.warn("setCameraActive: updated rows={}", n);
+        } catch (SQLException e) {
+            throw new RuntimeException("setCameraActive failed id=" + id, e);
+        }
+    }
+
     public static void close() {
         System.out.println("[Pg] close(): заглушка");
     }
