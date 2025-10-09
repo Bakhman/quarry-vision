@@ -38,6 +38,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -778,18 +779,91 @@ public class MainController {
         // авто-загрузка heatmap
         Platform.runLater(refreshHeat::fire);
 
-        // Cameras (stubs)
-        GridPane cams = new GridPane();
-        cams.setPadding(new Insets(12));
-        cams.setHgap(10);
-        cams.setVgap(10);
-        for (int i = 1; i <= 4; i++) {
-            Label l = new Label("Camera " + i + " -preview");
-            l.setStyle("-fx-border-color: #888; -fx-min-width: 320; -fx-min-height: 180; -fx-alignment: center;");
-            cams.add(l, (i-1)%2, (i-1)/2);
-        }
-        tabs.getTabs().add(new Tab("Cameras", cams));
+        // Cameras
+        VBox camPane = new VBox(10);
+        camPane.setPadding(new Insets(12));
+        Button camRefresh = new Button("Refresh");
+        Button camAdd = new Button("Add");
+        Button camDel = new Button("Delete");
+        Button camToggle = new Button("Enable/Disable");
+        TableView<DbCamera> camTable = new TableView<>();
+        camTable.setPrefHeight(260);
 
+        TableColumn<DbCamera,String> cId = new TableColumn<>("ID");
+        cId.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Integer.toString(cd.getValue().id())));
+        TableColumn<DbCamera,String> cName = new TableColumn<>("Name");
+        cName.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue().name()));
+        TableColumn<DbCamera,String> cUrl = new TableColumn<>("URL");
+        cUrl.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue().url()));
+        TableColumn<DbCamera,String> cAct = new TableColumn<>("Active");
+        cAct.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Boolean.toString(cd.getValue().active())));
+        camTable.getColumns().addAll(cId,cName,cUrl,cAct);
+
+        ObservableList<DbCamera> camItems = FXCollections.observableArrayList();
+        camTable.setItems(camItems);
+
+        Runnable loadCams = () -> {
+            camRefresh.setDisable(true);
+            exec.submit(() -> {
+                try {
+                    List<DbCamera> rows = Pg.listCameras();
+                    Platform.runLater(() -> camItems.setAll(rows));
+                } finally {
+                    Platform.runLater(() -> camRefresh.setDisable(false));
+                }
+            });
+        };
+        camRefresh.setOnAction(e -> loadCams.run());
+
+        // Add dialog: простые TextInputDialog'и
+        camAdd.setOnAction(e -> {
+            TextInputDialog dn = new TextInputDialog();
+            dn.setHeaderText("Camera name");
+            String n = dn.showAndWait().orElse("").trim();
+            if (n.isEmpty()) return;
+            TextInputDialog du = new TextInputDialog();
+            du.setHeaderText("Camera URL (RTSP/HTTP/file)");
+            String u = du.showAndWait().orElse("").trim();
+            if (u.isEmpty()) return;
+            exec.submit(() -> {
+                try {
+                    Pg.insertCamera(n, u, true);
+                    Platform.runLater(loadCams);
+                } catch (Exception ex) {
+                    Platform.runLater(() -> evArea.appendText("Add camera error: " + ex +"\n"));
+                }
+            });
+        });
+
+        camDel.setOnAction(e -> {
+            DbCamera sel = camTable.getSelectionModel().getSelectedItem();
+            if (sel == null) return;
+            exec.submit(() -> {
+                try {
+                    Pg.deleteCamera(sel.id());
+                    Platform.runLater(loadCams);
+                } catch (Exception ex) {
+                    Platform.runLater(() -> evArea.appendText("Delete camera error: " + ex + "\n"));
+                }
+            });
+        });
+
+        camToggle.setOnAction(e -> {
+            DbCamera sel = camTable.selectionModelProperty().get().getSelectedItem();
+            if (sel == null) return;
+            exec.submit(() -> {
+                try {
+                    Pg.setCameraActive(sel.id(), !sel.active());
+                    Platform.runLater(loadCams);
+                } catch (Exception ex) {
+                    Platform.runLater(() -> evArea.appendText("Toggle camera error: " + ex + "\n"));
+                }
+            });
+        });
+
+        camPane.getChildren().addAll(new HBox(8, camRefresh, camAdd, camDel, camToggle), camTable);
+        tabs.getTabs().add(new Tab("Cameras", camPane));
+        Platform.runLater(loadCams);
 
         root.setCenter(tabs);
 
