@@ -38,7 +38,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -48,6 +50,8 @@ public class MainController {
     private final ExecutorService exec = Executors.newFixedThreadPool(4);
     private final Config cfg = Config.load();
     private Button refreshBtn;
+    // Активные потоки камер: ключ = camera.id, значение = запущенный воркер
+    private final Map<Integer, CameraWorker> camWorkers = new ConcurrentHashMap<>();
     public MainController() {
         TabPane tabs = new TabPane();
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -786,6 +790,8 @@ public class MainController {
         Button camAdd = new Button("Add");
         Button camDel = new Button("Delete");
         Button camToggle = new Button("Enable/Disable");
+        Button camStart = new Button("Start");
+        Button camStop = new Button("Stop");
         TableView<DbCamera> camTable = new TableView<>();
         camTable.setPrefHeight(260);
 
@@ -861,9 +867,32 @@ public class MainController {
             });
         });
 
-        camPane.getChildren().addAll(new HBox(8, camRefresh, camAdd, camDel, camToggle), camTable);
+        camPane.getChildren().addAll(new HBox(8, camRefresh, camAdd, camDel, camToggle, camStart, camStop), camTable);
         tabs.getTabs().add(new Tab("Cameras", camPane));
         Platform.runLater(loadCams);
+        // --- Запуск воркера камеры ---
+        camStart.setOnAction(e -> {
+            DbCamera sel = camTable.getSelectionModel().getSelectedItem();
+            if (sel ==null) return;                       // нет выбранной камеры
+            if (camWorkers.containsKey(sel.id())) return; // уже запущена
+            // создаём воркер и поток-демон
+            CameraWorker w = new CameraWorker(sel.id(), sel.name());
+            camWorkers.put(sel.id(), w);
+            Thread t = new Thread(w, "cam-" + sel.id());
+            t.setDaemon(true);
+            t.start();evArea.appendText("[Cameras] Started worker for " + sel.name() + "\n");
+        });
+
+        // --- Остановка воркера камеры --
+        camStop.setOnAction(e -> {
+            DbCamera sel = camTable.getSelectionModel().getSelectedItem();
+            if (sel == null) return;
+            CameraWorker w = camWorkers.remove(sel.id());
+            if (w != null) {
+                w.shutdown(); // мягкая остановка цикла run()
+                evArea.appendText("[Cameras] Stopped worker for " + sel.name() + "\n");
+            }
+        });
 
         root.setCenter(tabs);
 
