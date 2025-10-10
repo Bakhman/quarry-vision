@@ -895,11 +895,6 @@ public class MainController {
         });
 
         root.setCenter(tabs);
-
-        // Initialization stubs
-        Pg.init();
-        exec.submit(new CameraWorker(1, "DEMO-1"));
-        exec.submit(new CameraWorker(2, "DEMO-2"));
     }
 
     private static String fmtMs(long ms) {
