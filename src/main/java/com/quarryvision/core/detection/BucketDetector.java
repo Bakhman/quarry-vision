@@ -90,7 +90,7 @@ public final class BucketDetector {
     }
 
     public DetectionResult detect(Path videoPath) {
-        long effectiveMergeMs = Long.getLong("qv.mergeMs", this.mergeMs);
+        int effectiveMergeMs = Integer.getInteger("qv.mergeMs", this.mergeMs);
         log.info("Detect params: stepFrames={}, diffThreshold={}, eventRatio={}, cooldownFrames={}, minChangedPixels={}, mergeMs={}",
                 stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, effectiveMergeMs);
         try {
@@ -178,7 +178,7 @@ public final class BucketDetector {
                 gray.copyTo(grayPrev);
                 idx++;
             }
-            List<Instant> merged = mergeClose(stamps, effectiveMergeMs);
+            List<Instant> merged = mergeClose(stamps, (long) effectiveMergeMs);
             return new DetectionResult(videoPath, merged.size(), List.copyOf(merged), fps, frameCount);
         }
 
