@@ -25,6 +25,8 @@ import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import org.bytedeco.opencv.opencv_videoio.VideoCapture;
+import org.opencv.core.Core;
 
 
 import java.awt.*;
@@ -841,7 +843,10 @@ public class MainController {
                 }
             });
         };
-        camRefresh.setOnAction(e -> loadCams.run());
+        camRefresh.setOnAction(e -> {
+            camLog.clear();
+            loadCams.run();
+        });
 
         // Add dialog: простые TextInputDialog'и
         camAdd.setOnAction(e -> {
@@ -884,7 +889,7 @@ public class MainController {
                     Pg.setCameraActive(sel.id(), !sel.active());
                     Platform.runLater(loadCams);
                 } catch (Exception ex) {
-                    Platform.runLater(() ->camLog.appendText("Toggle camera error: " + ex + "\n"));
+                    Platform.runLater(() -> camLog.appendText("Toggle camera error: " + ex + "\n"));
                 }
             });
         });
@@ -902,15 +907,37 @@ public class MainController {
             DbCamera sel = camTable.getSelectionModel().getSelectedItem();
             if (sel ==null) return;                       // нет выбранной камеры
             if (camWorkers.containsKey(sel.id())) return; // уже запущена
-            // создаём воркер и поток-демон
-            CameraWorker w = new CameraWorker(sel.id(), sel.name());
-            camWorkers.put(sel.id(), w);
-            Thread t = new Thread(w, "cam-" + sel.id());
-            t.setDaemon(true);
-            t.start();
-            camLog.appendText("[Cameras] Started worker for " + sel.name() + "\n");
-            camTable.refresh();
-            updateCamButtons.run();
+            camStart.setDisable(true);
+            String url = sel.url();
+            camLog.appendText("[Cameras] Validating " + sel.name() + " \u2192 " + maskUrl(url) + "\n");
+            exec.submit(() -> {
+               boolean ok;
+               String err = null;
+               try {
+                   ok = validateCamera(url, 3000); // 3s timeout
+               } catch (Exception ex) {
+                   ok = false;
+                   err = ex.toString();
+               }
+               final boolean passed = ok;
+               final String ferr = err;
+               Platform.runLater(() -> {
+                   if (passed) {
+                       camLog.appendText("[Cameras] OK: " + sel.name() + "\n");
+                       CameraWorker w = new CameraWorker(sel.id(), sel.name());
+                       camWorkers.put(sel.id(), w);
+                       Thread t = new Thread(w, "cam-" + sel.id());
+                       t.setDaemon(true);
+                       t.start();
+                       camLog.appendText("[Cameras] Started worker for " + sel.name() + "\n");
+                   } else {
+                       camLog.appendText("[Cameras] FAIL: " + sel.name() +
+                               (ferr != null ? " __ " + ferr : "") + "\n");
+                   }
+                   camTable.refresh();
+                   updateCamButtons.run();
+               });
+            });
         });
 
 
@@ -941,5 +968,60 @@ public class MainController {
 
     public Pane getRoot() {
         return root;
+    }
+
+    // Проверка доступности видеопотока: пытается открыть cap в пределах timeoutM
+    private static boolean validateCamera(String url, int timeoutMs) {
+        try {
+            // загрузка нативной библиотеки OpenCV (безопасно вызывать многократно)
+            try {
+                System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+            } catch (UnsatisfiedLinkError ignore) {}
+
+            if (url.startsWith("http") && (url.contains("youtube.com") || url.contains("youtu.be"))) return false;
+
+            long deadline = System.currentTimeMillis() + Math.max(500, timeoutMs);
+            // локальный файл: сначала конструктор (часто стабильнее на Windows)
+            Path p = Path.of(url);
+            if (Files.isRegularFile(p)) {
+                try(VideoCapture capStore = new VideoCapture(p.toString())){
+                    if (capStore.isOpened()) return true;
+                }
+            }
+
+            // общий путь: попытки открыть до таймаута
+            try (VideoCapture cap = new VideoCapture()) {
+                boolean opened = false;
+                // некоторые backend’ы открываются не мгновенно. Подождём до таймаута.
+                while (System.currentTimeMillis() < deadline) {
+                    opened = cap.open(url);
+                    if (opened || Thread.currentThread().isInterrupted()) break;
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+                return opened; // true если открыли, иначе false
+            }
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    // Маскируем креды в rtsp/http url: user:***@host
+    private static String maskUrl(String url) {
+        if (url == null) return "";
+        int at = url.indexOf('@');
+        int proto = url.indexOf("://");
+        if (proto > 0 && at > proto) {
+            int credsStart = proto + 3;
+            String creds = url.substring(credsStart, at);
+            if (creds.contains(":")) {
+                return url.substring(0, credsStart) + "*****@" + url.substring(at + 1);
+            }
+        }
+        return url;
     }
 }
