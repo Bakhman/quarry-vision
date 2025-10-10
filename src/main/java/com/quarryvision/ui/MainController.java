@@ -793,6 +793,9 @@ public class MainController {
         Button camStart = new Button("Start");
         Button camStop = new Button("Stop");
         TableView<DbCamera> camTable = new TableView<>();
+        TextArea camLog = new TextArea();
+        camLog.setEditable(false);
+        camLog.setPrefRowCount(7);
         camTable.setPrefHeight(260);
 
         TableColumn<DbCamera,String> cId = new TableColumn<>("ID");
@@ -803,17 +806,36 @@ public class MainController {
         cUrl.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue().url()));
         TableColumn<DbCamera,String> cAct = new TableColumn<>("Active");
         cAct.setCellValueFactory(cd -> new ReadOnlyStringWrapper(Boolean.toString(cd.getValue().active())));
-        camTable.getColumns().addAll(cId,cName,cUrl,cAct);
+        TableColumn<DbCamera,String> cState = new TableColumn<>("State");
+        cState.setCellValueFactory(cd -> new ReadOnlyStringWrapper(camWorkers
+                .containsKey(cd.getValue().id()) ? "RUNNING" : "STOPPED"));
+        camTable.getColumns().addAll(cId,cName,cUrl,cAct,cState);
 
         ObservableList<DbCamera> camItems = FXCollections.observableArrayList();
         camTable.setItems(camItems);
+
+        // Вспомогательный апдейтер доступности кнопок Start/Stop
+        Runnable updateCamButtons = () -> {
+            DbCamera sel = camTable.getSelectionModel().getSelectedItem();
+            boolean hasSel = sel != null;
+            boolean running = hasSel && camWorkers.containsKey(sel.id());
+            camStart.setDisable(!hasSel || running);
+            camStop.setDisable(!hasSel || !running);
+        };
+        camTable.getSelectionModel().selectedItemProperty().addListener(
+                (obs, o, n) -> updateCamButtons.run());
+        updateCamButtons.run();
 
         Runnable loadCams = () -> {
             camRefresh.setDisable(true);
             exec.submit(() -> {
                 try {
                     List<DbCamera> rows = Pg.listCameras();
-                    Platform.runLater(() -> camItems.setAll(rows));
+                    Platform.runLater(() -> {
+                        camItems.setAll(rows);
+                        camTable.refresh();
+                        updateCamButtons.run();
+                    });
                 } finally {
                     Platform.runLater(() -> camRefresh.setDisable(false));
                 }
@@ -836,7 +858,7 @@ public class MainController {
                     Pg.insertCamera(n, u, true);
                     Platform.runLater(loadCams);
                 } catch (Exception ex) {
-                    Platform.runLater(() -> evArea.appendText("Add camera error: " + ex +"\n"));
+                    Platform.runLater(() -> camLog.appendText("Add camera error: " + ex +"\n"));
                 }
             });
         });
@@ -849,7 +871,7 @@ public class MainController {
                     Pg.deleteCamera(sel.id());
                     Platform.runLater(loadCams);
                 } catch (Exception ex) {
-                    Platform.runLater(() -> evArea.appendText("Delete camera error: " + ex + "\n"));
+                    Platform.runLater(() -> camLog.appendText("Delete camera error: " + ex + "\n"));
                 }
             });
         });
@@ -862,14 +884,19 @@ public class MainController {
                     Pg.setCameraActive(sel.id(), !sel.active());
                     Platform.runLater(loadCams);
                 } catch (Exception ex) {
-                    Platform.runLater(() -> evArea.appendText("Toggle camera error: " + ex + "\n"));
+                    Platform.runLater(() ->camLog.appendText("Toggle camera error: " + ex + "\n"));
                 }
             });
         });
 
-        camPane.getChildren().addAll(new HBox(8, camRefresh, camAdd, camDel, camToggle, camStart, camStop), camTable);
+        camPane.getChildren().addAll(
+                new HBox(8, camRefresh, camAdd, camDel, camToggle, camStart, camStop),
+                camTable,
+                camLog
+        );
         tabs.getTabs().add(new Tab("Cameras", camPane));
         Platform.runLater(loadCams);
+
         // --- Запуск воркера камеры ---
         camStart.setOnAction(e -> {
             DbCamera sel = camTable.getSelectionModel().getSelectedItem();
@@ -880,8 +907,12 @@ public class MainController {
             camWorkers.put(sel.id(), w);
             Thread t = new Thread(w, "cam-" + sel.id());
             t.setDaemon(true);
-            t.start();evArea.appendText("[Cameras] Started worker for " + sel.name() + "\n");
+            t.start();
+            camLog.appendText("[Cameras] Started worker for " + sel.name() + "\n");
+            camTable.refresh();
+            updateCamButtons.run();
         });
+
 
         // --- Остановка воркера камеры --
         camStop.setOnAction(e -> {
@@ -890,8 +921,10 @@ public class MainController {
             CameraWorker w = camWorkers.remove(sel.id());
             if (w != null) {
                 w.shutdown(); // мягкая остановка цикла run()
-                evArea.appendText("[Cameras] Stopped worker for " + sel.name() + "\n");
+                camLog.appendText("[Cameras] Stopped worker for " + sel.name() + "\n");
             }
+            camTable.refresh();
+            updateCamButtons.run();
         });
 
         root.setCenter(tabs);
