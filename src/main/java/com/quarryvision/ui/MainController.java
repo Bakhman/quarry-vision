@@ -41,7 +41,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -147,35 +146,7 @@ public class MainController {
         // Detect UI: поле и кнопка
         TextField detectPath = new TextField();
         detectPath.setPromptText("E:/INBOX/locs.mp4");
-        Button detectBtn = new Button("Detect");
-        detectBtn.setOnAction(e -> {
-            String src = detectPath.getText().trim();
-            Path p = Path.of(src);
-            if (!Files.isRegularFile(p)) {
-                log.appendText("File <<" + src + ">> not found\n");
-                return;
-            }
-            detectBtn.setDisable(true);
-            exec.submit(() -> {
-                try {
-                    var dc = cfg.detection();
-                    var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
-                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs());
-                    var res = det.detect(p);
-                    int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
-                    int detId = Pg.insertDetection(videoId, dc.mergeMs(), res.timestampsMs());
-                    Platform.runLater(() -> {
-                        log.appendText(String.format("Detect: %s ...%n", src));
-                        log.appendText(String.format("Saved detection id=%d videoId=%d events=%d%n",
-                                detId, videoId, res.timestampsMs().size()));
-                    });
-                } catch (Exception ex2) {
-                    Platform.runLater(() -> log.appendText("Detect error: " + ex2 + "\n"));
-                } finally {
-                    Platform.runLater(() -> detectBtn.setDisable(false));
-                }
-            });
-        });
+        Button detectBtn = getButton(detectPath, log);
         importBox.getChildren().addAll(new Separator(), new Label("Detect video"), detectPath, detectBtn);
 
         // Queue — рабочая вкладка очереди обработки
@@ -812,7 +783,13 @@ public class MainController {
         TableColumn<DbCamera,String> cState = new TableColumn<>("State");
         cState.setCellValueFactory(cd -> new ReadOnlyStringWrapper(camWorkers
                 .containsKey(cd.getValue().id()) ? "RUNNING" : "STOPPED"));
-        camTable.getColumns().addAll(cId,cName,cUrl,cAct,cState);
+        TableColumn<DbCamera,String> cSeen = new TableColumn<>("Last seen");
+        cSeen.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue()
+                .lastSeenAt() == null ? "" : cd.getValue().lastSeenAt().toString().replace('T', ' ')));
+        TableColumn<DbCamera,String> cErr = new TableColumn<>("Last error");
+        cErr.setCellValueFactory(cd -> new ReadOnlyStringWrapper(cd.getValue()
+                .lastError() == null ? "" : cd.getValue().lastError()));
+        camTable.getColumns().addAll(cId,cName,cUrl,cAct,cState,cSeen,cErr);
 
         ObservableList<DbCamera> camItems = FXCollections.observableArrayList();
         camTable.setItems(camItems);
@@ -968,6 +945,9 @@ public class MainController {
                Platform.runLater(() -> {
                    if (passed) {
                        camLog.appendText("[Cameras] OK: " + sel.name() + "\n");
+                       try {
+                           Pg.setCameraHealth(sel.id(), Instant.now(), null);
+                       } catch (Exception ignore) {}
                        CameraWorker w = new CameraWorker(sel.id(), sel.name());
                        camWorkers.put(sel.id(), w);
                        Thread t = new Thread(w, "cam-" + sel.id());
@@ -977,6 +957,10 @@ public class MainController {
                    } else {
                        camLog.appendText("[Cameras] FAIL: " + sel.name() +
                                (ferr != null ? " __ " + ferr : "") + "\n");
+                       try {
+                           Pg.setCameraHealth(sel.id(), null,
+                                   ferr == null ? "validate failed" : ferr);
+                       } catch (Exception ignore) {}
                    }
                    camTable.refresh();
                    updateCamButtons.run();
@@ -999,6 +983,39 @@ public class MainController {
         });
 
         root.setCenter(tabs);
+    }
+
+    private Button getButton(TextField detectPath, TextArea log) {
+        Button detectBtn = new Button("Detect");
+        detectBtn.setOnAction(e -> {
+            String src = detectPath.getText().trim();
+            Path p = Path.of(src);
+            if (!Files.isRegularFile(p)) {
+                log.appendText("File <<" + src + ">> not found\n");
+                return;
+            }
+            detectBtn.setDisable(true);
+            exec.submit(() -> {
+                try {
+                    var dc = cfg.detection();
+                    var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
+                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs());
+                    var res = det.detect(p);
+                    int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
+                    int detId = Pg.insertDetection(videoId, dc.mergeMs(), res.timestampsMs());
+                    Platform.runLater(() -> {
+                        log.appendText(String.format("Detect: %s ...%n", src));
+                        log.appendText(String.format("Saved detection id=%d videoId=%d events=%d%n",
+                                detId, videoId, res.timestampsMs().size()));
+                    });
+                } catch (Exception ex2) {
+                    Platform.runLater(() -> log.appendText("Detect error: " + ex2 + "\n"));
+                } finally {
+                    Platform.runLater(() -> detectBtn.setDisable(false));
+                }
+            });
+        });
+        return detectBtn;
     }
 
     private static String fmtMs(long ms) {
