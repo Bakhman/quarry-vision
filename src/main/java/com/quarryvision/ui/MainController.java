@@ -9,6 +9,9 @@ import com.quarryvision.core.queue.DetectionQueueService;
 import com.quarryvision.core.queue.QueueTask;
 import com.quarryvision.core.video.CameraWorker;
 import com.quarryvision.core.detection.BucketDetector;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -16,11 +19,13 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.HPos;
 import javafx.scene.control.Button;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
+import javafx.util.Duration;
 import org.bytedeco.opencv.opencv_core.Size;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -763,9 +768,11 @@ public class MainController {
         Button camRefresh = new Button("Refresh");
         Button camAdd = new Button("Add");
         Button camDel = new Button("Delete");
+        Button camEdit = new Button("Edit");
         Button camToggle = new Button("Enable/Disable");
         Button camStart = new Button("Start");
         Button camStop = new Button("Stop");
+
         TableView<DbCamera> camTable = new TableView<>();
         TextArea camLog = new TextArea();
         camLog.setEditable(false);
@@ -869,6 +876,18 @@ public class MainController {
             loadCams.run();
         });
 
+        // авто-рефреш раз в 2с, только когда активна вкладка Cameras
+        Timeline camAutoRefresh = new Timeline(
+                new KeyFrame(Duration.seconds(2), ev -> {
+                    if (tabs.getSelectionModel().getSelectedItem().getText()
+                            .equals("Cameras")) {
+                        loadCams.run();
+                    }
+                })
+        );
+        camAutoRefresh.setCycleCount(Animation.INDEFINITE);
+        camAutoRefresh.play();
+
         // Add dialog: простые TextInputDialog'и
         camAdd.setOnAction(e -> {
             TextInputDialog dn = new TextInputDialog();
@@ -902,6 +921,44 @@ public class MainController {
             });
         });
 
+        camEdit.setOnAction(e -> {
+            DbCamera sel = camTable.getSelectionModel().getSelectedItem();
+            if (sel == null) return;
+
+            TextInputDialog dn = new TextInputDialog(sel.name());
+            dn.setHeaderText("Camera name");
+            String name = dn.showAndWait().orElse("").trim();
+            if (name.isEmpty()) return;
+
+            TextInputDialog du = new TextInputDialog(sel.url());
+            du.setHeaderText("Camera URL (rtsp/http/file");
+            String url = du.showAndWait().orElse("").trim();
+            if (url.isEmpty()) return;
+
+            // checkbox Active
+            CheckBox cb = new CheckBox("Active");
+            cb.setSelected(sel.active());
+            VBox pane = new VBox(8, new Label("Active:"), cb);
+            Dialog<Boolean> dlg = new Dialog<>();
+            dlg.setTitle("Active flag");
+            dlg.getDialogPane().setContent(pane);
+            dlg.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            Boolean active = dlg.showAndWait().orElse(false) ? cb.isSelected() : sel.active();
+
+            exec.submit(() -> {
+               try {
+                   Pg.editCamera(sel.id(), name, url, active);
+                   Platform.runLater(() -> {
+                       camLog.appendText("[Cameras] Updated #" + sel.id() + "\n");
+                       loadCams.run();
+                   });
+               } catch (Exception ex) {
+                   Platform.runLater(() ->
+                           camLog.appendText("Edit camera error: " + ex + "\n"));
+               }
+            });
+        });
+
         camToggle.setOnAction(e -> {
             DbCamera sel = camTable.selectionModelProperty().get().getSelectedItem();
             if (sel == null) return;
@@ -916,7 +973,7 @@ public class MainController {
         });
 
         camPane.getChildren().addAll(
-                new HBox(8, camRefresh, camAdd, camDel, camToggle, camStart, camStop),
+                new HBox(8, camRefresh, camAdd, camDel, camEdit, camToggle, camStart, camStop),
                 camTable,
                 camLog
         );
