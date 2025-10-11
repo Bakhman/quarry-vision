@@ -442,6 +442,21 @@ public final class Pg {
         }
     }
 
+    // camera editing
+    public static void editCamera(int id, String name, String url, boolean active) {
+        final String sql = "UPDATE cameras SET name=?, url=?, active=? WHERE id=?";
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, name);
+            ps.setString(2, url);
+            ps.setBoolean(3, active);
+            ps.setInt(4, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("editCamera failed id=" + id, e);
+        }
+    }
+
     public static void close() {
         System.out.println("[Pg] close(): заглушка");
     }
