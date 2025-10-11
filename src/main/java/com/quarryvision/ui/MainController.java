@@ -52,8 +52,9 @@ public class MainController {
     private final ExecutorService exec = Executors.newFixedThreadPool(4);
     private final Config cfg = Config.load();
     private Button refreshBtn;
-    // Активные потоки камер: ключ = camera.id, значение = запущенный воркер
     private final Map<Integer, CameraWorker> camWorkers = new ConcurrentHashMap<>();
+    private boolean camAutoStarted = false;
+
     public MainController() {
         TabPane tabs = new TabPane();
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -828,6 +829,44 @@ public class MainController {
                 (obs, o, n) -> updateCamButtons.run());
         updateCamButtons.run();
 
+        // --- Автозапуск всех active=true при старте (с валидацией) ---
+        Runnable autostartActive = () -> exec.submit(() -> {
+            try {
+                for (DbCamera c : Pg.listCameras()) {
+                    if (!c.active() || camWorkers.containsKey(c.id())) continue;
+                    final DbCamera cam = c;
+                    Platform.runLater(() -> {
+                        camLog.appendText("[Cameras] Validating " + cam.name() + " → " +
+                                maskUrl(cam.url()) +"\n");
+                    });
+                    boolean ok;
+                    try {
+                        ok = validateCamera(cam.url(), 3000);
+                    } catch (Exception ex) { ok = false;}
+                    if (ok) {
+                        CameraWorker w = new CameraWorker(cam.id(), cam.name());
+                        camWorkers.put(cam.id(), w);
+                        Thread t = new Thread(w, "cam-" + cam.id());
+                        t.setDaemon(true);
+                        t.start();
+                        Platform.runLater(() -> {
+                            camLog.appendText("[Cameras] Started worker for " + cam.name() + "\n");
+                            camTable.refresh();
+                            updateCamButtons.run();
+                        });
+                    } else {
+                        Platform.runLater(() -> {
+                            camLog.appendText("[Cameras] FAIL: " + cam.name() + "\n");
+                            camTable.refresh();
+                            updateCamButtons.run();
+                        });
+                    }
+                }
+            } catch (Exception ex) {
+                Platform.runLater(() -> camLog.appendText("Auto-start error: " + ex + "\n"));
+            }
+        });
+
         Runnable loadCams = () -> {
             camRefresh.setDisable(true);
             exec.submit(() -> {
@@ -837,6 +876,11 @@ public class MainController {
                         camItems.setAll(rows);
                         camTable.refresh();
                         updateCamButtons.run();
+                        // автозапуск active-камер только один раз после первой загрузки списка
+                        if (!camAutoStarted) {
+                           camAutoStarted = true;
+                           autostartActive.run();
+                        }
                     });
                 } finally {
                     Platform.runLater(() -> camRefresh.setDisable(false));
