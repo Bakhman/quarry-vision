@@ -360,7 +360,7 @@ public final class Pg {
 
     // список камер
     public static List<DbCamera> listCameras() {
-        final String sql = "SELECT id,name,url,active FROM cameras ORDER BY id";
+        final String sql = "SELECT id,name,url,active,last_seen_at,last_error FROM cameras ORDER BY id";
         try (Connection c = get();
              PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()
@@ -371,7 +371,9 @@ public final class Pg {
                         rs.getInt(1),
                         rs.getString(2),
                         rs.getString(3),
-                        rs.getBoolean(4)));
+                        rs.getBoolean(4),
+                        rs.getObject(5, OffsetDateTime.class),
+                        rs.getString(6)));
             }
             return out;
         } catch (SQLException e) {
@@ -419,6 +421,24 @@ public final class Pg {
             if (n != 1) log.warn("setCameraActive: updated rows={}", n);
         } catch (SQLException e) {
             throw new RuntimeException("setCameraActive failed id=" + id, e);
+        }
+    }
+
+    // status update
+    public static void setCameraHealth(int id, Instant lastSeenAt, String lastError) {
+        final String sql = "UPDATE cameras set " +
+                                "last_seen_at=?," +
+                                "last_error=? " +
+                            "WHERE id=?";
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)
+        ) {
+            ps.setObject(1, lastSeenAt == null ? null : lastSeenAt.atOffset(ZoneOffset.UTC));
+            ps.setString(2, lastError);
+            ps.setInt(3, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("setCameraHealth failed id=" + id, e);
         }
     }
 
