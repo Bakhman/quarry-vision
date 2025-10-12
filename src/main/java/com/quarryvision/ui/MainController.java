@@ -985,12 +985,21 @@ public class MainController {
         });
 
         Runnable loadCams = () -> {
-            camRefresh.setDisable(true);
             exec.submit(() -> {
                 try {
                     List<DbCamera> rows = Pg.listCameras();
                     Platform.runLater(() -> {
+                        // сохранить выбор
+                        int selIdx = camTable.getSelectionModel().getSelectedIndex();
+
                         camItems.setAll(rows);
+
+                        // восстановить выбор
+                        if (selIdx >= 0 && selIdx < camItems.size()) {
+                            camTable.getSelectionModel().select(selIdx);
+                            camTable.scrollTo(selIdx);
+                        }
+
                         camTable.refresh();
                         updateCamButtons.run();
                         // автозапуск active-камер только один раз после первой загрузки списка
@@ -999,8 +1008,9 @@ public class MainController {
                             autostartActive.run();
                         }
                     });
-                } finally {
-                    Platform.runLater(() -> camRefresh.setDisable(false));
+                } catch (Exception ex) {
+                    Platform.runLater(() ->
+                            camLog.appendText("Load cameras error: " + ex + "\n"));
                 }
             });
         };
