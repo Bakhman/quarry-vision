@@ -55,7 +55,7 @@ public class MainController {
     private final BorderPane root = new BorderPane();
     private final ExecutorService exec = Executors.newFixedThreadPool(4);
     private final Config cfg = Config.load();
-    private Button refreshBtn;
+    private Runnable reportsReload = null;
     private final Map<Integer, CameraWorker> camWorkers = new ConcurrentHashMap<>();
     private boolean camAutoStarted = false;
 
@@ -64,6 +64,121 @@ public class MainController {
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         // Import
+        tabs.getTabs().add(buildImportTab());
+        // Queue
+        tabs.getTabs().add(buildQueueTab());
+        // Reports
+        tabs.getTabs().add(buildReportsTab());
+        // Heatmap
+        tabs.getTabs().add(buildHeatMapTab());
+        // Cameras
+        tabs.getTabs().add(buildCamerasTab(tabs));
+
+        root.setCenter(tabs);
+    }
+
+    private Button getButton(TextField detectPath, TextArea log) {
+        Button detectBtn = new Button("Detect");
+        detectBtn.setOnAction(e -> {
+            String src = detectPath.getText().trim();
+            Path p = Path.of(src);
+            if (!Files.isRegularFile(p)) {
+                log.appendText("File <<" + src + ">> not found\n");
+                return;
+            }
+            detectBtn.setDisable(true);
+            exec.submit(() -> {
+                try {
+                    var dc = cfg.detection();
+                    var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
+                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs());
+                    var res = det.detect(p);
+                    int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
+                    int detId = Pg.insertDetection(videoId, dc.mergeMs(), res.timestampsMs());
+                    Platform.runLater(() -> {
+                        log.appendText(String.format("Detect: %s ...%n", src));
+                        log.appendText(String.format("Saved detection id=%d videoId=%d events=%d%n",
+                                detId, videoId, res.timestampsMs().size()));
+                    });
+                } catch (Exception ex2) {
+                    Platform.runLater(() -> log.appendText("Detect error: " + ex2 + "\n"));
+                } finally {
+                    Platform.runLater(() -> detectBtn.setDisable(false));
+                }
+            });
+        });
+        return detectBtn;
+    }
+
+    private static String fmtMs(long ms) {
+        long s = ms / 1000;
+        long h = s  / 3600;
+        long m = (s % 3600) / 60;
+        long sec = s % 60;
+        long msPart = ms % 1000;
+        return String.format("%02d:%02d:%02d.%03d", h, m, sec, msPart);
+    }
+
+    public Pane getRoot() {
+        return root;
+    }
+
+    // Проверка доступности видеопотока: пытается открыть cap в пределах timeoutM
+    private static boolean validateCamera(String url, int timeoutMs) {
+        try {
+            // загрузка нативной библиотеки OpenCV (безопасно вызывать многократно)
+            try {
+                System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+            } catch (UnsatisfiedLinkError ignore) {}
+
+            if (url.startsWith("http") && (url.contains("youtube.com") || url.contains("youtu.be"))) return false;
+
+            long deadline = System.currentTimeMillis() + Math.max(500, timeoutMs);
+            // локальный файл: сначала конструктор (часто стабильнее на Windows)
+            Path p = Path.of(url);
+            if (Files.isRegularFile(p)) {
+                try(VideoCapture capStore = new VideoCapture(p.toString())){
+                    if (capStore.isOpened()) return true;
+                }
+            }
+
+            // общий путь: попытки открыть до таймаута
+            try (VideoCapture cap = new VideoCapture()) {
+                boolean opened = false;
+                // некоторые backend’ы открываются не мгновенно. Подождём до таймаута.
+                while (System.currentTimeMillis() < deadline) {
+                    opened = cap.open(url);
+                    if (opened || Thread.currentThread().isInterrupted()) break;
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+                return opened; // true если открыли, иначе false
+            }
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    // Маскируем креды в rtsp/http url: user:***@host
+    private static String maskUrl(String url) {
+        if (url == null) return "";
+        int at = url.indexOf('@');
+        int proto = url.indexOf("://");
+        if (proto > 0 && at > proto) {
+            int credsStart = proto + 3;
+            String creds = url.substring(credsStart, at);
+            if (creds.contains(":")) {
+                return url.substring(0, credsStart) + "*****@" + url.substring(at + 1);
+            }
+        }
+        return url;
+    }
+
+    private Tab buildImportTab() {
         VBox importBox = new VBox(10);
         importBox.setPadding(new Insets(12));
         TextField path = new TextField();
@@ -125,7 +240,7 @@ public class MainController {
                             dc.mergeMs()
                     );
                     var res = det.detect(p);
-                    javafx.application.Platform.runLater(() -> {
+                    Platform.runLater(() -> {
                         var list = res.timestampsMs();
                         log.appendText("Events=" + list.size() +
                                 " fps=" + res.fps() + " frames=" + res.frames() + "\n");
@@ -138,22 +253,33 @@ public class MainController {
                         }
                     });
                 } catch (Exception ex) {
-                    javafx.application.Platform.runLater(() -> log.appendText("Detect error: " + ex + "\n"));
+                    Platform.runLater(() -> log.appendText("Detect error: " + ex + "\n"));
                 } finally {
-                    javafx.application.Platform.runLater(() -> detect.setDisable(false));
+                    Platform.runLater(() -> detect.setDisable(false));
                 }
             });
         });
-
-        importBox.getChildren().addAll(new Label("Import video"), path, scan, detect, log);
-        tabs.getTabs().add(new Tab("Import", importBox));
 
         // Detect UI: поле и кнопка
         TextField detectPath = new TextField();
         detectPath.setPromptText("E:/INBOX/locs.mp4");
         Button detectBtn = getButton(detectPath, log);
-        importBox.getChildren().addAll(new Separator(), new Label("Detect video"), detectPath, detectBtn);
 
+        importBox.getChildren().addAll(
+                new Label("Import video"),
+                path,
+                scan,
+                detect,
+                log,
+                new Separator(),
+                new Label("Detect video"),
+                detectPath,
+                detectBtn
+        );
+        return new Tab("Import", importBox);
+    }
+
+    private Tab buildQueueTab() {
         // Queue — рабочая вкладка очереди обработки
         // Назначение: управлять обработкой видео в одном фоновом потоке,
         // видеть статус и прогресс. Сейчас процессор — симулятор (10 шагов по 10%).
@@ -247,11 +373,11 @@ public class MainController {
                 Platform.runLater(() -> {
                     qLog.appendText(
                             "Saved detection #" + detId +
-                            " videoId=" + videoId +
-                            " events=" + dr.events() +
-                            " fps=" + dr.fps() +
-                            " frames=" +dr.frames() + "\n");
-                    if (refreshBtn != null) refreshBtn.fire();
+                                    " videoId=" + videoId +
+                                    " events=" + dr.events() +
+                                    " fps=" + dr.fps() +
+                                    " frames=" +dr.frames() + "\n");
+                    if (reportsReload != null) reportsReload.run();
                 });
             });
             queue.start(processor);
@@ -279,7 +405,7 @@ public class MainController {
                     switch (t.status) {
                         case DONE, FAILED, CANCELED -> true;
                         default -> false;
-            });
+                    });
             qTable.refresh();
         });
 
@@ -288,8 +414,11 @@ public class MainController {
                 new HBox(8, qAdd, qStart, qStop, qCancel, qClear),
                 qTable, qLog
         );
-        tabs.getTabs().add(new Tab("Queue", q));
 
+        return new Tab("Queue", q);
+    }
+
+    private Tab buildReportsTab() {
         // Reports
         VBox rep = new VBox(10);
         rep.setPadding(new Insets(12));
@@ -298,7 +427,7 @@ public class MainController {
         list.setPrefHeight(260);
         TextField filterText = new TextField();
         filterText.setPromptText("Filter: id, path, merge, date... (Ctrl+F)");
-        refreshBtn = new Button("Refresh");
+        Button refreshBtn = new Button("Refresh");
         Button showEv = new Button("Show events");
         Button del = new Button("Delete detection");
         Button openFolder = new Button("Open video folder");
@@ -389,10 +518,10 @@ public class MainController {
                 List<String> rows = Pg.listRecentDetections(pageSize[0], offset);
                 try {
                     if (rows.isEmpty() && page[0] > 0) {
-                    // откат на предыдущую страницу
-                    page[0]--;
-                    offset = page[0] * pageSize[0];
-                    rows = Pg.listRecentDetections(pageSize[0], page[0] * pageSize[0]);
+                        // откат на предыдущую страницу
+                        page[0]--;
+                        offset = page[0] * pageSize[0];
+                        rows = Pg.listRecentDetections(pageSize[0], page[0] * pageSize[0]);
                     }
                     // offset ТОЛЬКО внутри этой лямбды
                     final int effectiveOffset = offset;
@@ -447,6 +576,8 @@ public class MainController {
 
         // авто-подгрузка при открытии
         Platform.runLater(() -> loadPage.run());
+        this.reportsReload = () -> Platform.runLater(loadPage);
+        Platform.runLater(loadPage);
 
         showEv.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
@@ -516,54 +647,54 @@ public class MainController {
         exportCsv.setOnAction(e -> {
             exportCsv.setDisable(true);
             exec.submit(() -> {
-               try {
-                   long v = Pg.countVideos();
-                   long d = Pg.countDetections();
-                   long ev = Pg.countEvents();
-                   var agg = Pg.listDailyAgg(365);
-                   var top = Pg.listVideoAgg(1000);
-                   StringBuilder sb = new StringBuilder();
-                   sb.append("Summary\n");
-                   sb.append("Videos,Detections,Events\n");
-                   sb.append(v).append(',').append(d).append(',').append(ev).append("\r\n\r\n");
-                   sb.append("Daily\n");
-                   sb.append("Day,Detections,Events\n");
-                   for (var a : agg) {
-                       sb.append(a.day).append(',').append(a.detections).append(',').append(a.events).append("\r\n");
-                   }
-                   sb.append("\r\nVideos\n");
-                   sb.append("Path,Detections,Events\n");
-                   for (var vrow : top) {
-                       // экранирование запятых
-                       String csvPath = "\"" + vrow.path.replace("\"", "\"\"") + "\"";
-                       sb.append(csvPath).append(',').append(vrow.detections).append(',').append(vrow.events).append("\r\n");
-                   }
-                   String content = sb.toString();
-                   Platform.runLater(() -> {
-                       try {
-                           FileChooser fc = new FileChooser();
-                           fc.setTitle("Save Reports CSV");
-                           fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV","*.csv"));
-                           String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-                           fc.setInitialFileName("qv-report-" + ts + ".csv");
-                           var win = rep.getScene() != null ? rep.getScene().getWindow() : null;
-                           var f = fc.showSaveDialog(win);
-                           if (f != null) {
-                               Files.writeString(f.toPath(), content, StandardCharsets.UTF_8);
-                               evArea.appendText("Exported CSV: " + f.getAbsolutePath() + "\n");
-                           }
-                       } catch (IOException io) {
-                           evArea.appendText("Export error: " + io + "\n");
-                       } finally {
-                           exportCsv.setDisable(false);
-                       }
-                   });
-               } catch (Exception ex) {
-                   Platform.runLater(() -> {
-                       evArea.appendText("Export error: " + ex + "\n");
-                       exportCsv.setDisable(false);
-                   });
-               }
+                try {
+                    long v = Pg.countVideos();
+                    long d = Pg.countDetections();
+                    long ev = Pg.countEvents();
+                    var agg = Pg.listDailyAgg(365);
+                    var top = Pg.listVideoAgg(1000);
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Summary\n");
+                    sb.append("Videos,Detections,Events\n");
+                    sb.append(v).append(',').append(d).append(',').append(ev).append("\r\n\r\n");
+                    sb.append("Daily\n");
+                    sb.append("Day,Detections,Events\n");
+                    for (var a : agg) {
+                        sb.append(a.day).append(',').append(a.detections).append(',').append(a.events).append("\r\n");
+                    }
+                    sb.append("\r\nVideos\n");
+                    sb.append("Path,Detections,Events\n");
+                    for (var vrow : top) {
+                        // экранирование запятых
+                        String csvPath = "\"" + vrow.path.replace("\"", "\"\"") + "\"";
+                        sb.append(csvPath).append(',').append(vrow.detections).append(',').append(vrow.events).append("\r\n");
+                    }
+                    String content = sb.toString();
+                    Platform.runLater(() -> {
+                        try {
+                            FileChooser fc = new FileChooser();
+                            fc.setTitle("Save Reports CSV");
+                            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV","*.csv"));
+                            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+                            fc.setInitialFileName("qv-report-" + ts + ".csv");
+                            var win = rep.getScene() != null ? rep.getScene().getWindow() : null;
+                            var f = fc.showSaveDialog(win);
+                            if (f != null) {
+                                Files.writeString(f.toPath(), content, StandardCharsets.UTF_8);
+                                evArea.appendText("Exported CSV: " + f.getAbsolutePath() + "\n");
+                            }
+                        } catch (IOException io) {
+                            evArea.appendText("Export error: " + io + "\n");
+                        } finally {
+                            exportCsv.setDisable(false);
+                        }
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        evArea.appendText("Export error: " + ex + "\n");
+                        exportCsv.setDisable(false);
+                    });
+                }
             });
         });
 
@@ -688,16 +819,17 @@ public class MainController {
                 new HBox(8, refreshBtn, showEv, del, openFolder, exportCsv, exportEvents),
                 new HBox(8, new Label("Page size:"), pageSizeTf, prev, next, pageInfo),
                 filterText, list, stats, daily, byVideo, byMerge, evArea);
-        tabs.getTabs().add(new Tab("Reports", rep));
+        return new Tab("Reports", rep);
+    }
 
-        // авто-подгрузка при открытии
-        Platform.runLater(refreshBtn::fire);
-
-        // --- Heatmap tab ---
+    private Tab buildHeatMapTab() {
         VBox heatPane = new VBox(10);
         heatPane.setPadding(new Insets(12));
         Label heatHdr = new Label("Week heatmap (by Events)");
         Button refreshHeat = new Button("Refresh");
+        TextArea evArea = new TextArea();
+        evArea.setEditable(false);
+        evArea.setPrefRowCount(10);
 
         TableView<DbWeekAgg> byWeek = new TableView<>();
         byWeek.setPrefHeight(220);
@@ -749,7 +881,7 @@ public class MainController {
                     });
                 } catch (Exception ex) {
                     Platform.runLater(() -> {
-                       evArea.appendText("Heatmap load error: " + ex + "\n");
+                        evArea.appendText("Heatmap load error: " + ex + "\n");
                     });
                 } finally {
                     Platform.runLater(() -> refreshHeat.setDisable(false));
@@ -758,10 +890,11 @@ public class MainController {
         });
 
         heatPane.getChildren().addAll(heatHdr, refreshHeat, heat, byWeek);
-        tabs.getTabs().add(new Tab("Heatmap", heatPane));
-        // авто-загрузка heatmap
         Platform.runLater(refreshHeat::fire);
+        return new Tab("Heatmap", heatPane);
+    }
 
+    private Tab buildCamerasTab(final TabPane tabs) {
         // Cameras
         VBox camPane = new VBox(10);
         camPane.setPadding(new Insets(12));
@@ -862,8 +995,8 @@ public class MainController {
                         updateCamButtons.run();
                         // автозапуск active-камер только один раз после первой загрузки списка
                         if (!camAutoStarted) {
-                           camAutoStarted = true;
-                           autostartActive.run();
+                            camAutoStarted = true;
+                            autostartActive.run();
                         }
                     });
                 } finally {
@@ -879,8 +1012,8 @@ public class MainController {
         // авто-рефреш раз в 2с, только когда активна вкладка Cameras
         Timeline camAutoRefresh = new Timeline(
                 new KeyFrame(Duration.seconds(2), ev -> {
-                    if (tabs.getSelectionModel().getSelectedItem().getText()
-                            .equals("Cameras")) {
+                    Tab tab = tabs.getSelectionModel().getSelectedItem();
+                    if (tab != null && "Cameras".equals(tab.getText())) {
                         loadCams.run();
                     }
                 })
@@ -908,6 +1041,7 @@ public class MainController {
             });
         });
 
+        // Delete
         camDel.setOnAction(e -> {
             DbCamera sel = camTable.getSelectionModel().getSelectedItem();
             if (sel == null) return;
@@ -921,6 +1055,7 @@ public class MainController {
             });
         });
 
+        // Edit
         camEdit.setOnAction(e -> {
             DbCamera sel = camTable.getSelectionModel().getSelectedItem();
             if (sel == null) return;
@@ -946,19 +1081,20 @@ public class MainController {
             Boolean active = dlg.showAndWait().orElse(false) ? cb.isSelected() : sel.active();
 
             exec.submit(() -> {
-               try {
-                   Pg.editCamera(sel.id(), name, url, active);
-                   Platform.runLater(() -> {
-                       camLog.appendText("[Cameras] Updated #" + sel.id() + "\n");
-                       loadCams.run();
-                   });
-               } catch (Exception ex) {
-                   Platform.runLater(() ->
-                           camLog.appendText("Edit camera error: " + ex + "\n"));
-               }
+                try {
+                    Pg.editCamera(sel.id(), name, url, active);
+                    Platform.runLater(() -> {
+                        camLog.appendText("[Cameras] Updated #" + sel.id() + "\n");
+                        loadCams.run();
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() ->
+                            camLog.appendText("Edit camera error: " + ex + "\n"));
+                }
             });
         });
 
+        // Toggle active
         camToggle.setOnAction(e -> {
             DbCamera sel = camTable.selectionModelProperty().get().getSelectedItem();
             if (sel == null) return;
@@ -972,14 +1108,6 @@ public class MainController {
             });
         });
 
-        camPane.getChildren().addAll(
-                new HBox(8, camRefresh, camAdd, camDel, camEdit, camToggle, camStart, camStop),
-                camTable,
-                camLog
-        );
-        tabs.getTabs().add(new Tab("Cameras", camPane));
-        Platform.runLater(loadCams);
-
         // --- Запуск воркера камеры ---
         camStart.setOnAction(e -> {
             DbCamera sel = camTable.getSelectionModel().getSelectedItem();
@@ -989,39 +1117,39 @@ public class MainController {
             String url = sel.url();
             camLog.appendText("[Cameras] Validating " + sel.name() + " \u2192 " + maskUrl(url) + "\n");
             exec.submit(() -> {
-               boolean ok;
-               String err = null;
-               try {
-                   ok = validateCamera(url, 3000); // 3s timeout
-               } catch (Exception ex) {
-                   ok = false;
-                   err = ex.toString();
-               }
-               final boolean passed = ok;
-               final String ferr = err;
-               Platform.runLater(() -> {
-                   if (passed) {
-                       camLog.appendText("[Cameras] OK: " + sel.name() + "\n");
-                       try {
-                           Pg.setCameraHealth(sel.id(), Instant.now(), null);
-                       } catch (Exception ignore) {}
-                       CameraWorker w = new CameraWorker(sel.id(), sel.name());
-                       camWorkers.put(sel.id(), w);
-                       Thread t = new Thread(w, "cam-" + sel.id());
-                       t.setDaemon(true);
-                       t.start();
-                       camLog.appendText("[Cameras] Started worker for " + sel.name() + "\n");
-                   } else {
-                       camLog.appendText("[Cameras] FAIL: " + sel.name() +
-                               (ferr != null ? " __ " + ferr : "") + "\n");
-                       try {
-                           Pg.setCameraHealth(sel.id(), null,
-                                   ferr == null ? "validate failed" : ferr);
-                       } catch (Exception ignore) {}
-                   }
-                   camTable.refresh();
-                   updateCamButtons.run();
-               });
+                boolean ok;
+                String err = null;
+                try {
+                    ok = validateCamera(url, 3000); // 3s timeout
+                } catch (Exception ex) {
+                    ok = false;
+                    err = ex.toString();
+                }
+                final boolean passed = ok;
+                final String ferr = err;
+                Platform.runLater(() -> {
+                    if (passed) {
+                        camLog.appendText("[Cameras] OK: " + sel.name() + "\n");
+                        try {
+                            Pg.setCameraHealth(sel.id(), Instant.now(), null);
+                        } catch (Exception ignore) {}
+                        CameraWorker w = new CameraWorker(sel.id(), sel.name());
+                        camWorkers.put(sel.id(), w);
+                        Thread t = new Thread(w, "cam-" + sel.id());
+                        t.setDaemon(true);
+                        t.start();
+                        camLog.appendText("[Cameras] Started worker for " + sel.name() + "\n");
+                    } else {
+                        camLog.appendText("[Cameras] FAIL: " + sel.name() +
+                                (ferr != null ? " __ " + ferr : "") + "\n");
+                        try {
+                            Pg.setCameraHealth(sel.id(), null,
+                                    ferr == null ? "validate failed" : ferr);
+                        } catch (Exception ignore) {}
+                    }
+                    camTable.refresh();
+                    updateCamButtons.run();
+                });
             });
         });
 
@@ -1039,107 +1167,13 @@ public class MainController {
             updateCamButtons.run();
         });
 
-        root.setCenter(tabs);
-    }
-
-    private Button getButton(TextField detectPath, TextArea log) {
-        Button detectBtn = new Button("Detect");
-        detectBtn.setOnAction(e -> {
-            String src = detectPath.getText().trim();
-            Path p = Path.of(src);
-            if (!Files.isRegularFile(p)) {
-                log.appendText("File <<" + src + ">> not found\n");
-                return;
-            }
-            detectBtn.setDisable(true);
-            exec.submit(() -> {
-                try {
-                    var dc = cfg.detection();
-                    var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
-                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs());
-                    var res = det.detect(p);
-                    int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
-                    int detId = Pg.insertDetection(videoId, dc.mergeMs(), res.timestampsMs());
-                    Platform.runLater(() -> {
-                        log.appendText(String.format("Detect: %s ...%n", src));
-                        log.appendText(String.format("Saved detection id=%d videoId=%d events=%d%n",
-                                detId, videoId, res.timestampsMs().size()));
-                    });
-                } catch (Exception ex2) {
-                    Platform.runLater(() -> log.appendText("Detect error: " + ex2 + "\n"));
-                } finally {
-                    Platform.runLater(() -> detectBtn.setDisable(false));
-                }
-            });
-        });
-        return detectBtn;
-    }
-
-    private static String fmtMs(long ms) {
-        long s = ms / 1000;
-        long h = s  / 3600;
-        long m = (s % 3600) / 60;
-        long sec = s % 60;
-        long msPart = ms % 1000;
-        return String.format("%02d:%02d:%02d.%03d", h, m, sec, msPart);
-    }
-
-    public Pane getRoot() {
-        return root;
-    }
-
-    // Проверка доступности видеопотока: пытается открыть cap в пределах timeoutM
-    private static boolean validateCamera(String url, int timeoutMs) {
-        try {
-            // загрузка нативной библиотеки OpenCV (безопасно вызывать многократно)
-            try {
-                System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-            } catch (UnsatisfiedLinkError ignore) {}
-
-            if (url.startsWith("http") && (url.contains("youtube.com") || url.contains("youtu.be"))) return false;
-
-            long deadline = System.currentTimeMillis() + Math.max(500, timeoutMs);
-            // локальный файл: сначала конструктор (часто стабильнее на Windows)
-            Path p = Path.of(url);
-            if (Files.isRegularFile(p)) {
-                try(VideoCapture capStore = new VideoCapture(p.toString())){
-                    if (capStore.isOpened()) return true;
-                }
-            }
-
-            // общий путь: попытки открыть до таймаута
-            try (VideoCapture cap = new VideoCapture()) {
-                boolean opened = false;
-                // некоторые backend’ы открываются не мгновенно. Подождём до таймаута.
-                while (System.currentTimeMillis() < deadline) {
-                    opened = cap.open(url);
-                    if (opened || Thread.currentThread().isInterrupted()) break;
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-                return opened; // true если открыли, иначе false
-            }
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    // Маскируем креды в rtsp/http url: user:***@host
-    private static String maskUrl(String url) {
-        if (url == null) return "";
-        int at = url.indexOf('@');
-        int proto = url.indexOf("://");
-        if (proto > 0 && at > proto) {
-            int credsStart = proto + 3;
-            String creds = url.substring(credsStart, at);
-            if (creds.contains(":")) {
-                return url.substring(0, credsStart) + "*****@" + url.substring(at + 1);
-            }
-        }
-        return url;
+        camPane.getChildren().addAll(
+                new HBox(8, camRefresh, camAdd, camDel, camEdit, camToggle, camStart, camStop),
+                camTable,
+                camLog
+        );
+        Tab tab = new Tab("Cameras", camPane);
+        Platform.runLater(loadCams);
+        return tab;
     }
 }
