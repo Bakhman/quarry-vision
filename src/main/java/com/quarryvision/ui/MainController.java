@@ -1088,8 +1088,9 @@ public class MainController {
             dlg.setTitle("Active flag");
             dlg.getDialogPane().setContent(pane);
             dlg.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-            Boolean active = dlg.showAndWait().orElse(false) ? cb.isSelected() : sel.active();
-
+            // Возвращаем выбранное значение чекбокса только при OK
+            dlg.setResultConverter(btn -> btn == ButtonType.OK ? cb.isSelected() : null);
+            boolean active = dlg.showAndWait().orElse(sel.active());
             exec.submit(() -> {
                 try {
                     Pg.editCamera(sel.id(), name, url, active);
