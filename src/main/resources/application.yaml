@@ -19,9 +19,9 @@ detect:
   cooldownFrames: 150
   minChangedPixels: 35000
   morphKernel: { w: 3, h: 3}
-  emaAlpha: 0.45      # быстрее падение EMA
-  thrLowFactor: 0.96  # раньше выходим из ACTIVE
-  minActiveMs: 900   # не резать слишком коротко
+  emaAlpha: 0.45       # быстрее падение EMA
+  thrLowFactor: 0.96   # раньше выходим из ACTIVE
+  minActiveMs: 900      # не резать слишком коротко
   nmsWindowMs: 1200   # меньше подавление соседних пиков
-  mergeMs: 2500       # события ближе этого окна считаем одной погрузкой
+  mergeMs: 2500        # события ближе этого окна считаем одной погрузкой
   trace: true

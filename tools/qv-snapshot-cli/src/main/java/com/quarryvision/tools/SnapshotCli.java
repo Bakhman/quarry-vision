@@ -20,6 +20,7 @@ public final class SnapshotCli {
         Map<String,String> a = parseArgs(args);
         String mode   = a.getOrDefault("mode","csv");                // csv|db
         Path outDir   = Paths.get(a.getOrDefault("out","snapshots"));
+        long biasMs = Long.parseLong(a.getOrDefault("biasMs", "-700")) // смещение времени кадра
         int quality   = Integer.parseInt(a.getOrDefault("quality","90"));
 
         List<Event> events = switch (mode) {
@@ -42,8 +43,9 @@ public final class SnapshotCli {
             try {
                 Path dir = outDir.resolve(baseNoExt(e.video)).resolve("det_" + e.detId);
                 Files.createDirectories(dir);
+                long t = Math.max(0, e.tMs + biasMs);
                 Path out = dir.resolve("event_" + e.evtId + ".jpg");
-                grab(e.video, e.tMs, out, quality);
+                grab(e.video, t, out, quality);
                 System.out.println("OK  " + out);
                 ok++;
             } catch (Exception ex) {
