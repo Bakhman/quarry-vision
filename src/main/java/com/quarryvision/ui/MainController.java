@@ -91,7 +91,8 @@ public class MainController {
                 try {
                     var dc = cfg.detection();
                     var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
-                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs());
+                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs(),
+                            dc.emaAlpha(), dc.thrLowFactor(), dc.minActiveMs(), dc.nmsWindowMs(), dc.trace());
                     var res = det.detect(p);
                     int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
                     int detId = Pg.insertDetection(videoId, dc.mergeMs(), res.timestampsMs());
@@ -237,7 +238,12 @@ public class MainController {
                             dc.cooldownFrames(),
                             dc.minChangedPixels(),
                             new Size(dc.morphW(), dc.morphH()),
-                            dc.mergeMs()
+                            dc.mergeMs(),
+                            dc.emaAlpha(),
+                            dc.thrLowFactor(),
+                            dc.minActiveMs(),
+                            dc.nmsWindowMs(),
+                            dc.trace()
                     );
                     var res = det.detect(p);
                     Platform.runLater(() -> {

@@ -28,7 +28,7 @@ java -jar target/qv-snapshot-cli.jar \
          from events e
          join detections d on d.id=e.detection_id
          join videos v on v.id=d.video_id
-         where e.detection_id=103 order by e.id"
+         order by e.id"
 ```
 
 ---
