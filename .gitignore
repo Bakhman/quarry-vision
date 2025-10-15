@@ -48,3 +48,7 @@ project-structure.txt
 
 ### Separate directory for training files and cheat sheets ###
 /.practice/
+
+# detector traces
+trace/
+!trace/.gitkeep

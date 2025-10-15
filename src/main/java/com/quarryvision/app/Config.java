@@ -12,7 +12,9 @@ public record Config(Db db, ImportConf imp, DetectConf detection) {
     public record ImportConf(List<String> patterns, String inbox, String source) {}
     public record DetectConf(int stepFrames, int diffThreshold, double eventRatio,
                              int cooldownFrames, int minChangedPixels, int morphW, int morphH,
-                             int mergeMs) {}
+                             int mergeMs,
+                             double emaAlpha, double thrLowFactor, int minActiveMs, int nmsWindowMs,
+                             boolean trace) {}
 
     @SuppressWarnings("unchecked")
     public static Config load() {
@@ -36,10 +38,16 @@ public record Config(Db db, ImportConf imp, DetectConf detection) {
             int morphW           = mk.get("w")                 != null ? ((Number) mk.get("w")).intValue()                 : 3;
             int morphH           = mk.get("h")                 != null ? ((Number) mk.get("h")).intValue()                 : 3;
             int mergeMs = det.get("mergeMs") != null ? ((Number) det.get("mergeMs")).intValue() : 4000;
+            double emaAlpha = det.get("emaAlpha") != null ? ((Number) det.get("emaAlpha")).doubleValue() : 0.20;
+            double thrLowFactor = det.get("thrLowFactor") != null ? ((Number) det.get("thrLowFactor")).doubleValue() : 0.60;
+            int minActiveMs = det.get("minActiveMs") != null ? ((Number) det.get("minActiveMs")).intValue() : 1200;
+            int nmsWindowMs = det.get("nmsWindowMs") != null ? ((Number) det.get("nmsWindowMs")).intValue() : 2000;
+            boolean trace = det.get("trace") != null ? (Boolean) det.get("trace") : false;
             return  new Config(
                     new Db((String) db.get("url"), (String) db.get("user"), (String) db.get("pass")),
                     new ImportConf((List<String>) imp.get("patterns"), (String) imp.get("inbox"), (String) imp.get("source")),
-                    new DetectConf(stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, morphW, morphH, mergeMs)
+                    new DetectConf(stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, morphW, morphH, mergeMs,
+                            emaAlpha, thrLowFactor, minActiveMs, nmsWindowMs, trace)
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to load application.yaml", e);
