@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+
 /**
  * Простейший «детектор ковшей»: анализирует разности кадров,
  * при превышении порога считает событие.
@@ -147,13 +148,13 @@ public final class BucketDetector {
                 }
             }
 
-            Mat prev = new Mat();
-            Mat frame = new Mat();
-            Mat grayPrev = new Mat();
-            Mat gray = new Mat();
-            Mat diff = new Mat();
+            Mat prev = new Mat(),
+            frame = new Mat(),
+            grayPrev = new Mat(),
+            gray = new Mat(),
+            diff = new Mat(),
             // ядро морфологии (Mat), построенное из заданного Size
-            Mat kernel = opencv_imgproc.getStructuringElement(
+            kernel = opencv_imgproc.getStructuringElement(
                     opencv_imgproc.MORPH_RECT,
                     morphKernel
             );
@@ -168,114 +169,124 @@ public final class BucketDetector {
             double thrLow = Math.max(1e-6, eventRatio * thrLowFactor);
             long minActiveFrames = Math.max(1L, Math.round((minActiveMs / 1000.0) * fps));
 
-            // первый кадр
-            if (!cap.read(prev) || prev.empty()) {
-                log.error("First frame is empty: {}", videoPath);
-                return new DetectionResult(videoPath, 0, List.of(), fps, frameCount);
-            }
-            opencv_imgproc.cvtColor(prev, grayPrev, opencv_imgproc.COLOR_BGR2GRAY);
-            opencv_imgproc.GaussianBlur(grayPrev, grayPrev, new Size(5, 5), 0);
-
-            long idx = 1;
-            while (true) {
-                if (!cap.read(frame) || frame.empty()) {
-                    break; // EOF/кадр пуст — выходим без WARN
+            try {// первый кадр
+                if (!cap.read(prev) || prev.empty()) {
+                    log.error("First frame is empty: {}", videoPath);
+                    return new DetectionResult(videoPath, 0, List.of(), fps, frameCount);
                 }
-                // шаг через несколько кадров
-                for (int s = 1; s < stepFrames; s++) {
-                    if (!cap.read(frame) || frame.empty()) { break; }
-                    idx++;
-                }
-                // могли выйти из внутреннего шага из-за EOF -> кадр пустой
-                if (frame.empty()) {
-                    // тихо выходим: конец файла
-                    break;
-                }
+                opencv_imgproc.cvtColor(prev, grayPrev, opencv_imgproc.COLOR_BGR2GRAY);
+                opencv_imgproc.GaussianBlur(grayPrev, grayPrev, new Size(5, 5), 0);
 
-                opencv_imgproc.cvtColor(frame, gray, opencv_imgproc.COLOR_BGR2GRAY);
-                opencv_imgproc.GaussianBlur(gray, gray, new Size(5, 5), 0);
+                long idx = 1;
+                while (true) {
+                    if (!cap.read(frame) || frame.empty()) {
+                        break; // EOF/кадр пуст — выходим без WARN
+                    }
+                    // шаг через несколько кадров
+                    for (int s = 1; s < stepFrames; s++) {
+                        if (!cap.read(frame) || frame.empty()) {
+                            break;
+                        }
+                        idx++;
+                    }
+                    // могли выйти из внутреннего шага из-за EOF -> кадр пустой
+                    if (frame.empty()) {
+                        // тихо выходим: конец файла
+                        break;
+                    }
 
-                opencv_core.absdiff(gray, grayPrev, diff);
-                opencv_imgproc.threshold(diff, diff, diffThreshold, 255, opencv_imgproc.THRESH_BINARY);
-                // Морфология: убираем мелкий шум и заращиваем разрывы
-                opencv_imgproc.erode(diff, diff, kernel);
-                opencv_imgproc.dilate(diff, diff, kernel);
-                double white = opencv_core.countNonZero(diff);
-                // Отсечь мелкие всплески
-                if (white < minChangedPixels) {
+                    opencv_imgproc.cvtColor(frame, gray, opencv_imgproc.COLOR_BGR2GRAY);
+                    opencv_imgproc.GaussianBlur(gray, gray, new Size(5, 5), 0);
+
+                    opencv_core.absdiff(gray, grayPrev, diff);
+                    opencv_imgproc.threshold(diff, diff, diffThreshold, 255, opencv_imgproc.THRESH_BINARY);
+                    // Морфология: убираем мелкий шум и заращиваем разрывы
+                    opencv_imgproc.erode(diff, diff, kernel);
+                    opencv_imgproc.dilate(diff, diff, kernel);
+                    double white = opencv_core.countNonZero(diff);
+                    // Отсечь мелкие всплески
+                    if (white < minChangedPixels) {
+                        gray.copyTo(grayPrev);
+                        idx++;
+                        continue;
+                    }
+                    double ratio = white / (double) (diff.rows() * diff.cols());
+                    ema = emaAlpha * ratio + (1.0 - emaAlpha) * ema;
+                    long msNow = (long) ((idx / fps) * 1000.0);
+                    String stStr = st.name();
+                    int evtMark = 0;
+
+                    switch (st) {
+                        case IDLE -> {
+                            if ((idx - lastEventFrame) > cooldownFrames && ema >= thrHigh) {
+                                st = S.ACTIVE;
+                                activeStartFrame = idx;
+                            }
+                        }
+                        case ACTIVE -> {
+                            if (ema < thrLow) {
+                                long durFrames = idx - activeStartFrame;
+                                if (durFrames >= minActiveFrames) {
+                                    long mid = activeStartFrame + durFrames / 2;
+                                    long ms = (long) ((mid / fps) * 1000.0);
+                                    stamps.add(Instant.ofEpochMilli(ms));
+                                    lastEventFrame = idx;
+                                    evtMark = 1;
+                                }
+                                st = S.IDLE;
+                                stStr = st.name();
+                            }
+                        }
+                    }
+
+                    if (traceOut != null) traceOut.printf("%d,%d,%.6f,%.6f,%s,%d%n",
+                            msNow, idx, ratio, ema, stStr, evtMark);
+
+                    // старый триггер по ratio убран
+
                     gray.copyTo(grayPrev);
                     idx++;
-                    continue;
                 }
-                 double ratio = white / (double) (diff.rows() * diff.cols());
-                ema = emaAlpha * ratio + (1.0 - emaAlpha) * ema;
-                long msNow = (long) ((idx / fps) * 1000.0);
-                String stStr = st.name();
-                int evtMark = 0;
 
-                switch (st) {
-                    case IDLE -> {
-                        if ((idx - lastEventFrame) > cooldownFrames && ema >= thrHigh) {
-                            st = S.ACTIVE;
-                            activeStartFrame = idx;
-                        }
-                    }
-                    case ACTIVE -> {
-                        if (ema < thrLow) {
-                            long durFrames = idx - activeStartFrame;
-                            if (durFrames >= minActiveFrames) {
-                                long mid = activeStartFrame + durFrames/2;
-                                long ms = (long) ((mid / fps) * 1000.0);
-                                stamps.add(Instant.ofEpochMilli(ms));
-                                lastEventFrame = idx;
-                                evtMark = 1;
-                            }
-                            st = S.IDLE;
-                            stStr = st.name();
+                // EOF: если остались в ACTIVE — зафиксировать интервал
+                if (st == S.ACTIVE) {
+                    long durFrames = idx - activeStartFrame;
+                    if (durFrames >= minActiveFrames) {
+                        long mid = activeStartFrame + durFrames / 2;
+                        long ms = (long) ((mid / fps) * 1000.0);
+                        stamps.add(Instant.ofEpochMilli(ms));
+                        if (log.isInfoEnabled()) {
+                            long startMs = (long) ((activeStartFrame / fps) * 1000.0);
+                            long durMs = (long) ((durFrames / fps) * 1000.0);
+                            log.info("evt interval: startMs={} durMs{} midMs{}", startMs, durMs, ms);
                         }
                     }
                 }
-
-                if (traceOut != null) traceOut.printf("%d,%d,%.6f,%.6f,%s,%d%n",
-                        msNow, idx, ratio, ema, stStr, evtMark);
-
-                // старый триггер по ratio убран
-
-                gray.copyTo(grayPrev);
-                idx++;
-            }
-
-            // EOF: если остались в ACTIVE — зафиксировать интервал
-            if (st == S.ACTIVE) {
-                long durFrames = idx - activeStartFrame;
-                if (durFrames >= minActiveFrames) {
-                    long mid = activeStartFrame + durFrames/2;
-                    long ms = (long) ((mid / fps) * 1000.0);
-                    stamps.add(Instant.ofEpochMilli(ms));
-                    if (log.isInfoEnabled()) {
-                        long startMs = (long) ((activeStartFrame / fps) * 1000.0);
-                        long durMs = (long) ((durFrames / fps) * 1000.0);
-                        log.info("evt interval: startMs={} durMs{} midMs{}", startMs, durMs, ms);
+                // простое подавление соседних пиков (NMS окно по времени)
+                List<Instant> nms = new ArrayList<>();
+                Instant winStart = null;
+                for (Instant t : stamps) {
+                    if (winStart == null || t.toEpochMilli() - winStart.toEpochMilli() > nmsWindowMs) {
+                        nms.add(t);
+                        winStart = t;
                     }
                 }
-            }
-            // простое подавление соседних пиков (NMS окно по времени)
-            List<Instant> nms = new ArrayList<>();
-            Instant winStart = null;
-            for (Instant t : stamps) {
-                if (winStart == null || t.toEpochMilli() - winStart.toEpochMilli() > nmsWindowMs) {
-                    nms.add(t);
-                    winStart = t;
+                List<Instant> merged = mergeClose(nms, (long) effectiveMergeMs);
+                return new DetectionResult(videoPath, merged.size(), List.copyOf(merged), fps, frameCount);
+            } finally {
+                // гарантированное освобождение нативной памяти
+                release(prev, frame, grayPrev, gray, diff, kernel);
+                if (traceOut != null) {
+                    traceOut.flush();
+                    traceOut.close();
+                    traceOut = null;
                 }
             }
-            List<Instant> merged = mergeClose(nms, (long) effectiveMergeMs);
-            if (traceOut != null) {
-                traceOut.flush();
-                traceOut.close();
-                traceOut = null;
-            }
-            return new DetectionResult(videoPath, merged.size(), List.copyOf(merged), fps, frameCount);
         }
 
+    }
+
+    private static void release(Mat... mats) {
+        for (Mat m : mats) if (m != null) m.release();
     }
 }
