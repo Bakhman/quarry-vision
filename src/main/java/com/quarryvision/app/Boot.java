@@ -10,7 +10,6 @@ import javafx.stage.Stage;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.Executors;
 
 // JavaFX Application (main)
 public class Boot extends Application {
@@ -26,6 +25,15 @@ public class Boot extends Application {
             e.printStackTrace();
         }
         MainController root = new MainController();
+        stage.setOnCloseRequest(e -> {
+            System.out.println("Shutting down...");
+            try {
+                Pg.close();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            System.exit(0);
+        });
         stage.setTitle("QuarryVision - MVP");
         stage.setScene(new Scene(root.getRoot(), 900, 600));
         stage.show();

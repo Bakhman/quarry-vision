@@ -458,6 +458,17 @@ public final class Pg {
     }
 
     public static void close() {
-        System.out.println("[Pg] close(): заглушка");
+        if (ds != null) {
+            try {
+                ds.close();
+                System.out.println("[Pg] pool closed");
+            } catch (Exception e) {
+                System.err.println("[Pg] close() error: " + e.getMessage());
+            } finally {
+                ds = null;
+            }
+        } else {
+            System.out.println("[Pg] close(): pool already null");
+        }
     }
 }
