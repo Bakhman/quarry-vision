@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 // простая сцена/вкладки
 public class MainController {
@@ -58,6 +59,8 @@ public class MainController {
     private Runnable reportsReload = null;
     private final Map<Integer, CameraWorker> camWorkers = new ConcurrentHashMap<>();
     private boolean camAutoStarted = false;
+    private Timeline camAutoRefresh;
+
 
     public MainController() {
         TabPane tabs = new TabPane();
@@ -1026,7 +1029,7 @@ public class MainController {
         });
 
         // авто-рефреш раз в 2с, только когда активна вкладка Cameras
-        Timeline camAutoRefresh = new Timeline(
+        camAutoRefresh = new Timeline(
                 new KeyFrame(Duration.seconds(2), ev -> {
                     Tab tab = tabs.getSelectionModel().getSelectedItem();
                     if (tab != null && "Cameras".equals(tab.getText())) {
@@ -1192,5 +1195,18 @@ public class MainController {
         Tab tab = new Tab("Cameras", camPane);
         Platform.runLater(loadCams);
         return tab;
+    }
+
+    /** Корректная остано вка фоновых работ UI. Вызывать при выходе. */
+    public void shutdown() {
+        try {
+            if (camAutoRefresh != null) camAutoRefresh.stop();
+        } catch (Throwable ignore) {
+
+        }
+        try {
+            exec.shutdownNow();
+            exec.awaitTermination(2, TimeUnit.SECONDS);
+        } catch (Throwable ignore) {}
     }
 }

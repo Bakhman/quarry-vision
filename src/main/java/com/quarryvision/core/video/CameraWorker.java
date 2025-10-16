@@ -77,5 +77,6 @@ public class CameraWorker implements Runnable {
     public void shutdown() {
         run = false;
         log.info("CameraWorker #{} '{}' shutdown requested", id, name);
+        Thread.currentThread().interrupt();
     }
 }

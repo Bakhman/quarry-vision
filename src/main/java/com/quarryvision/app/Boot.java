@@ -25,13 +25,18 @@ public class Boot extends Application {
             e.printStackTrace();
         }
         MainController root = new MainController();
+        // страховка на случай внешнего kill
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try { Pg.close(); } catch (Throwable ignore) {}
+        }));
         stage.setOnCloseRequest(e -> {
             System.out.println("Shutting down...");
             try {
-                Pg.close();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+                // 1) остановить фоновые задачи UI
+                root.shutdown();
+            } catch (Throwable ignore) {}
+            try { Pg.close(); } catch (Throwable ignore) {}
+            javafx.application.Platform.exit();
             System.exit(0);
         });
         stage.setTitle("QuarryVision - MVP");
