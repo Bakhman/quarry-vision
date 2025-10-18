@@ -23,13 +23,23 @@ jobs:
         run: mvn -B -ntp -DskipTests clean package
 
       # Устанавливаем Liberica JRE Full (с JavaFX) через Chocolatey
-      - name: Install Liberica JRE Full 21
+      - name: Install JRE with JavaFX (Azul Zulu FX)
+        shell: pwsh
         run: |
-          choco install -y liberica-jre-full --version=21.0.4
-          $jre = Get-ChildItem 'C:\Program Files\BellSoft\' -Directory | Where-Object { $_.Name -like 'LibericaJRE-21*Full' } | Select-Object -First 1
-          if (-not $jre) { throw "Liberica JRE Full not found" }
-          echo "JRE Path: $($jre.FullName)"
-          echo "JRE_DIR=$($jre.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          choco install -y zulu21-jre-fx || choco install -y zulu17-jre-fx
+          $roots = @('C:\Program Files\Zulu', 'C:\Program Files (x86)\Zulu')
+          $jre = $null
+          foreach ($r in $roots) {
+            if (Test-Path $r) {
+              $cands = Get-ChildItem $r -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'zulu-(21|17).*-jre' }
+              foreach ($d in $cands) {
+                if (Test-Path "$($d.FullName)\bin\javaw.exe") { $jre = $d.FullName; break }
+              }
+            }
+            if ($jre) { break }
+          }
+          if (-not $jre) { throw "Zulu JRE FX not found" }
+          "JRE_DIR=$jre" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Make dist
         shell: pwsh
