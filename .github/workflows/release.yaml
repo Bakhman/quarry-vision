@@ -1,0 +1,105 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-zip:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Temurin 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build shaded JAR
+        run: mvn -q -DskipTests clean package
+
+      - name: Prepare dist layout
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force -Path dist\QuarryVision\app | Out-Null
+          New-Item -ItemType Directory -Force -Path dist\QuarryVision\config | Out-Null
+
+          Invoke-WebRequest -Uri "https://download.bell-sw.com/java/21.0.8+10/bellsoft-jre21.0.8+10-windows-amd64-full.zip" -OutFile jre.zip
+          Expand-Archive -Path jre.zip -DestinationPath dist -Force
+          $jreDir = Get-ChildItem dist | Where-Object { $_.PSIsContainer -and $_.Name -like "jre*" } | Select-Object -First 1
+          Rename-Item -Path "dist\$($jreDir.Name)" -NewName "jre"
+          Move-Item -Path dist\jre -Destination dist\QuarryVision\jre -Force
+
+          Copy-Item app\target\quarry-vision*.jar dist\QuarryVision\app\quarry-vision.jar
+
+          Set-Content -Encoding ascii -Path dist\QuarryVision\run.bat -Value @(
+            '@echo off',
+            'title QuarryVision',
+            'cd /d "%~dp0"',
+            'set "JAVA=%~dp0jre\bin\javaw.exe"',
+            'set OPTS=-Xms256m -Xmx1024m -Xss512k -XX:MaxDirectMemorySize=512m ^',
+            ' -Dorg.bytedeco.javacpp.maxbytes=4G ^',
+            ' -Dorg.bytedeco.javacpp.maxphysicalbytes=4G',
+            'start "" "%JAVA%" %OPTS% -cp "%~dp0config;%~dp0app\quarry-vision.jar" com.quarryvision.app.Boot',
+            'exit'
+          )
+
+          Set-Content -Encoding ascii -Path dist\QuarryVision\config\application.yaml -Value @(
+            'app:',
+            '  name: QuarryVision',
+            'db:',
+            '  url: jdbc:postgresql://localhost:5432/quarryvision',
+            '  user: quarry',
+            '  pass: quarry',
+            'import:',
+            '  inbox: E:/INBOX',
+            '  source: F:/USB',
+            '  patterns: ["*.mp4","*.mkv","*.ts"]',
+            'detect:',
+            '  stepFrames: 15',
+            '  diffThreshold: 45',
+            '  eventRatio: 0.18',
+            '  cooldownFrames: 150',
+            '  minChangedPixels: 35000',
+            '  morphKernel: { w: 3, h: 3 }',
+            '  mergeMs: 2500',
+            '  emaAlpha: 0.45',
+            '  thrLowFactor: 0.96',
+            '  minActiveMs: 900',
+            '  nmsWindowMs: 1200',
+            '  trace: false'
+          )
+
+          Compress-Archive -Path dist\QuarryVision\* -DestinationPath QuarryVision.zip -Force
+          Get-FileHash QuarryVision.zip -Algorithm SHA256 | ForEach-Object {
+            "$($_.Algorithm)  $($_.Hash)  QuarryVision.zip" } | Out-File -Encoding ascii SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuarryVision-zip
+          path: |
+            QuarryVision.zip
+            SHA256SUMS.txt
+
+  release:
+    needs: build-zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: QuarryVision-zip
+          path: .
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            QuarryVision.zip
+            SHA256SUMS.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: true
