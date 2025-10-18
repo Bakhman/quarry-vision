@@ -8,9 +8,11 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -18,44 +20,33 @@ jobs:
           cache: maven
 
       - name: Build
-        run: mvn -B -ntp clean package
+        run: mvn -B -ntp -DskipTests clean package
 
-      # Скачиваем JRE для Windows, чтобы не хранить в репо
-      - name: Download Windows JRE 17 (Temurin)
+      # Устанавливаем Liberica JRE Full (с JavaFX) через Chocolatey
+      - name: Install Liberica JRE Full 21
         run: |
-          set -euo pipefail
-          curl -L -o jre.zip https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jre/hotspot/normal/eclipse
-          unzip -q jre.zip -d .github/pack/
-          mv "$(ls -d .github/pack/jdk-17* | head -n1)" .github/pack/jre-17
+          choco install -y liberica-jre-full --version=21.0.4
+          $jre = Get-ChildItem 'C:\Program Files\BellSoft\' -Directory | Where-Object { $_.Name -like 'LibericaJRE-21*Full' } | Select-Object -First 1
+          if (-not $jre) { throw "Liberica JRE Full not found" }
+          echo "JRE Path: $($jre.FullName)"
+          echo "JRE_DIR=$($jre.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-
-      - name: Make dist zip
+      - name: Make dist
+        shell: pwsh
         run: |
-          set -euo pipefail
-          JAR=$(ls target/*.jar | grep -vE '(sources|javadoc|tests)' | head -n1)
-          echo "Using JAR: $JAR"
-          mkdir -p dist/app dist/config
-          cp "$JAR" dist/app/quarry-vision.jar
-          cp src/main/resources/application.yaml dist/config/
-          # Bundled JRE
-          if [ -d .github/pack/jre-17 ]; then
-            cp -r .github/pack/jre-17 dist/jre
-          fi
-          
-          # Startup script (исправленные пути и опечатки)
-          if [ -f .github/dist/run.bat ]; then
-            cp .github/dist/run.bat dist/
-          elif [ -f .github/pack/windows/run.bat ]; then
-            cp .github/pack/windows/run.bat dist/
-          else
-            echo "ERROR: run.bat not found" >&2
-            exit 1
-          fi
-          (cd dist && zip -r "../quarry-vision-${GITHUB_REF_NAME}.zip" .)
+          $jar = (Get-ChildItem target\*.jar | Where-Object { $_.Name -notmatch 'sources|javadoc|tests' } | Select-Object -First 1)
+          if (-not $jar) { throw "Jar not found" }
+          New-Item -ItemType Directory -Force -Path dist\app, dist\config | Out-Null
+          Copy-Item $jar.FullName dist\app\quarry-vision.jar
+          Copy-Item src\main\resources\application.yaml dist\config\
+          Copy-Item .github\dist\run.bat dist\
+          Copy-Item -Recurse -Force "$env:JRE_DIR" dist\jre
 
-      - name: Checksums
+      - name: Zip dist
+        shell: pwsh
         run: |
-          sha256sum "quarry-vision-${GITHUB_REF_NAME}.zip" > "quarry-vision-${GITHUB_REF_NAME}.zip.sha256"
+          Compress-Archive -Path dist\* -DestinationPath "quarry-vision-$env:GITHUB_REF_NAME.zip" -Force
+          Get-FileHash "quarry-vision-$env:GITHUB_REF_NAME.zip" -Algorithm SHA256 | ForEach-Object { $_.Hash } | Out-File -Encoding ascii "quarry-vision-$env:GITHUB_REF_NAME.zip.sha256"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -64,5 +55,5 @@ jobs:
           name: ${{ github.ref_name }}
           files: |
             quarry-vision-${{ github.ref_name }}.zip
-            target/*.jar
             quarry-vision-${{ github.ref_name }}.zip.sha256
+            target\*.jar
