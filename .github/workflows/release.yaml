@@ -1,11 +1,13 @@
 name: release
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -17,37 +19,22 @@ jobs:
 
       - name: Build
         run: mvn -B -ntp clean package
+
       - name: Make dist zip
         run: |
+          set -e
+          JAR=$(ls target/*-SNAPSHOT.jar | head -n1)
+          echo "Using JAR: @JAR"
           mkdir -p dist/app dist/config
-          cp target/quarry-vision-1.0-SNAPSHOT-shaded.jar dist/app/quarry-vision.jar
-          cp -r src/main/resources/application.yaml dist/config/
-          cd dist && zip -r ../quarry-vision-${{ github.ref_name }}.zip .
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: quarry-vision-${{ github.ref_name }}.zip
-          path: |
-            quarry-vision-${{ github.ref_name }}.zip
-            target/quarry-vision-1.0-SNAPSHOT-shaded.jar
+          cp "$JAR" dist/app/quarry-vision.jar
+          cp src/main/resources/application.yaml dist/config/
+          cd dist && zip -r ../quarry-vision-${GITHUB_REF_NAME}.zip .
 
-  publish:
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: quarry-vision-${{ github.ref_name }}
-          path: .
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
           files: |
             quarry-vision-${{ github.ref_name }}.zip
-            target/quarry-vision-1.0-SNAPSHOT-shaded.jar
+            target/*-SNAPSHOT.jar
