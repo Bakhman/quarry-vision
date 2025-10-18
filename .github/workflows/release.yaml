@@ -24,11 +24,17 @@ jobs:
         run: |
           set -e
           JAR=$(ls target/*-SNAPSHOT.jar | head -n1)
-          echo "Using JAR: @JAR"
+          echo "Using JAR: $JAR"
           mkdir -p dist/app dist/config
           cp "$JAR" dist/app/quarry-vision.jar
           cp src/main/resources/application.yaml dist/config/
-          cd dist && zip -r ../quarry-vision-${GITHUB_REF_NAME}.zip .
+          # include runtime and startup script
+          cp -r pack/jre-21.0.8-full dist/jre || echo "jre folder not found, skipping"
+          cp pack/windows/run.bat || true
+          
+          cd dist
+          zip -r ../quarry-vision-${GITHUB_REF_NAME}.zip .
+          cd ..
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
