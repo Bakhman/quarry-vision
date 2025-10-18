@@ -20,26 +20,42 @@ jobs:
       - name: Build
         run: mvn -B -ntp clean package
 
+      # Скачиваем JRE для Windows, чтобы не хранить в репо
+      - name: Download Windows JRE 17 (Temurin)
+        run: |
+          set -euo pipefail
+          curl -L -o jre.zip https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jre/hotspot/normal/eclipse
+          unzip -q jre.zip -d .github/pack/
+          mv "$(ls -d .github/pack/jdk-17* | head -n1)" .github/pack/jre-17
+
+
       - name: Make dist zip
         run: |
-          set -e
-          JAR=$(ls target/*-SNAPSHOT.jar | head -n1)
+          set -euo pipefail
+          JAR=$(ls target/*.jar | grep -vE '(sources|javadoc|tests)' | head -n1)
           echo "Using JAR: $JAR"
           mkdir -p dist/app dist/config
           cp "$JAR" dist/app/quarry-vision.jar
           cp src/main/resources/application.yaml dist/config/
-          # Optional bundled JRE
-          if [ -d pack/jre-21.0.8-full ]; then
-            cp -r pack/jre-21.0.8-full dist/jre
+          # Bundled JRE
+          if [ -d .github/pack/jre-17 ]; then
+            cp -r .github/pack/jre-17 dist/jre
           fi
           
-          # Startup script
-          if [ -f .github/dist/run.but ]; then
-            cp.github/dist/run.bat dist/
-          elif [ -f pack/windows/run.bat ]; then
-            cp pack/windows/run.bat dist/
+          # Startup script (исправленные пути и опечатки)
+          if [ -f .github/dist/run.bat ]; then
+            cp .github/dist/run.bat dist/
+          elif [ -f .github/pack/windows/run.bat ]; then
+            cp .github/pack/windows/run.bat dist/
+          else
+            echo "ERROR: run.bat not found" >&2
+            exit 1
           fi
           (cd dist && zip -r "../quarry-vision-${GITHUB_REF_NAME}.zip" .)
+
+      - name: Checksums
+        run: |
+          sha256sum "quarry-vision-${GITHUB_REF_NAME}.zip" > "quarry-vision-${GITHUB_REF_NAME}.zip.sha256"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -48,4 +64,5 @@ jobs:
           name: ${{ github.ref_name }}
           files: |
             quarry-vision-${{ github.ref_name }}.zip
-            target/*-SNAPSHOT.jar
+            target/*.jar
+            quarry-vision-${{ github.ref_name }}.zip.sha256
