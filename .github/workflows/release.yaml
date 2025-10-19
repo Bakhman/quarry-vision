@@ -40,7 +40,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $urls = @(
-            'https://download.bell-sw.com/java/21.0.8+12/bellsoft-jre21.0.8+12-windows-i586-full.zip',
             'https://download.bell-sw.com/java/21.0.8+12/bellsoft-jre21.0.8+12-windows-amd64-full.zip',
             'https://download.bell-sw.com/java/21.0.7+9/bellsoft-jdk21.0.7+9-windows-amd64-full.zip',
             'https://download.bell-sw.com/java/21.0.5+11/bellsoft-jre21.0.5+11-windows-amd64-full.zip',
