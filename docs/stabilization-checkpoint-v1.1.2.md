@@ -75,7 +75,7 @@ git push origin v1.1.2
 
 ---
 
-**Автор:** Richard  
+**Автор:** Bakhmai   
 **Дата:** 2025-10-19
 
 
