@@ -39,12 +39,26 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $url = 'https://download.bell-sw.com/java/21.0.4+7/bellsoft-jre21.0.4+7-windows-amd64-full.zip'
-          Invoke-WebRequest $url -OutFile jre.zip
+          $urls = @(
+            'https://download.bell-sw.com/java/21.0.8+12/bellsoft-jre21.0.8+12-windows-i586-full.zip',
+            'https://download.bell-sw.com/java/21.0.8+12/bellsoft-jre21.0.8+12-windows-amd64-full.zip',
+            'https://download.bell-sw.com/java/21.0.7+9/bellsoft-jdk21.0.7+9-windows-amd64-full.zip',
+            'https://download.bell-sw.com/java/21.0.5+11/bellsoft-jre21.0.5+11-windows-amd64-full.zip',
+            'https://download.bell-sw.com/java/21.0.4+7/bellsoft-jre21.0.4+7-windows-amd64-full.zip'
+          )
+          $ok = $false
+          foreach ($u in $urls) {
+            Write-Host "Trying $u"
+            try {
+              Invoke-WebRequest $u -OutFile jre.zip -TimeoutSec 120
+              $ok = $true; break
+            } catch {
+              Write-Host "Failed: $($_.Exception.Message)"
+            }
+          }
+          if (-not $ok) { throw 'No working Liberica JRE Full URL' }
           Expand-Archive -Path jre.zip -DestinationPath dist -Force
-          $jreDir = Get-ChildItem dist -Directory |
-            Where-Object { Test-Path "$($_.FullName)\bin\java.exe" } |
-            Select-Object -First 1
+          $jreDir = Get-ChildItem dist -Directory | Where-Object { Test-Path "$($_.FullName)\bin\java.exe" } | Select-Object -First 1
           if (-not $jreDir) { throw 'Liberica JRE Full not found after extract' }
           if (Test-Path dist\jre) { Remove-Item -Recurse -Force dist\jre }
           Rename-Item -Path $jreDir.FullName -NewName 'jre'
