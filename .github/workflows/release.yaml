@@ -8,55 +8,52 @@ permissions:
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Setup Temurin JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: maven
 
-      - name: Build
+      - name: Build fat JAR
         run: mvn -B -ntp -DskipTests clean package
 
-      # Устанавливаем Liberica JRE Full (с JavaFX) через Chocolatey
-      - name: Install JRE with JavaFX (Azul Zulu FX)
-        shell: pwsh
+      - name: Prepare dist structure
         run: |
-          choco install -y zulu21-jre-fx || choco install -y zulu17-jre-fx
-          $roots = @('C:\Program Files\Zulu', 'C:\Program Files (x86)\Zulu')
-          $jre = $null
-          foreach ($r in $roots) {
-            if (Test-Path $r) {
-              $cands = Get-ChildItem $r -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'zulu-(21|17).*-jre' }
-              foreach ($d in $cands) {
-                if (Test-Path "$($d.FullName)\bin\javaw.exe") { $jre = $d.FullName; break }
-              }
-            }
-            if ($jre) { break }
-          }
-          if (-not $jre) { throw "Zulu JRE FX not found" }
-          "JRE_DIR=$jre" | Out-File -FilePath $env:GITHUB_ENV -Append
+          set -e
+          mkdir -p dist/app dist/config
+          JAR=$(ls target/*-SNAPSHOT.jar | head -n1)
+          echo "Using JAR: $JAR"
+          cp "$JAR" dist/app/quarry-vision.jar
+          cp src/main/resources/application.yaml dist/config/
+          if [ -f .github/dist/run.bat ]; then
+            cp .github/dist/run.bat dist/
+          fi
 
-      - name: Make dist
+      - name: Bundle Liberica JRE 21 Full (Windows)
         shell: pwsh
         run: |
-          $jar = (Get-ChildItem target\*.jar | Where-Object { $_.Name -notmatch 'sources|javadoc|tests' } | Select-Object -First 1)
-          if (-not $jar) { throw "Jar not found" }
-          New-Item -ItemType Directory -Force -Path dist\app, dist\config | Out-Null
-          Copy-Item $jar.FullName dist\app\quarry-vision.jar
-          Copy-Item src\main\resources\application.yaml dist\config\
-          Copy-Item .github\dist\run.bat dist\
-          Copy-Item -Recurse -Force "$env:JRE_DIR" dist\jre
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://download.bell-sw.com/java/21.0.4+7/bellsoft-jre21.0.4+7-windows-amd64-full.zip'
+          Invoke-WebRequest $url -OutFile jre.zip
+          Expand-Archive -Path jre.zip -DestinationPath dist -Force
+          $jreDir = Get-ChildItem dist -Directory |
+            Where-Object { Test-Path "$($_.FullName)\bin\java.exe" } |
+            Select-Object -First 1
+          if (-not $jreDir) { throw 'Liberica JRE Full not found after extract' }
+          if (Test-Path dist\jre) { Remove-Item -Recurse -Force dist\jre }
+          Rename-Item -Path $jreDir.FullName -NewName 'jre'
 
-      - name: Zip dist
-        shell: pwsh
+      - name: Make ZIP
         run: |
-          Compress-Archive -Path dist\* -DestinationPath "quarry-vision-$env:GITHUB_REF_NAME.zip" -Force
-          Get-FileHash "quarry-vision-$env:GITHUB_REF_NAME.zip" -Algorithm SHA256 | ForEach-Object { $_.Hash } | Out-File -Encoding ascii "quarry-vision-$env:GITHUB_REF_NAME.zip.sha256"
+          cd dist
+          zip -r "../quarry-vision-${GITHUB_REF_NAME}.zip" .
+          cd ..
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -65,5 +62,4 @@ jobs:
           name: ${{ github.ref_name }}
           files: |
             quarry-vision-${{ github.ref_name }}.zip
-            quarry-vision-${{ github.ref_name }}.zip.sha256
-            target\*.jar
+            target/*-SNAPSHOT.jar
