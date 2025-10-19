@@ -27,9 +27,9 @@ jobs:
         run: |
           set -e
           mkdir -p dist/app dist/config
-          JAR=$(ls target/*-SNAPSHOT.jar | head -n1)
-          echo "Using JAR: $JAR"
-          cp "$JAR" dist/app/quarry-vision.jar
+          JAR=$(find target -maxdepth 1 -type f -name 'quarry-vision-*-SNAPSHOT.jar' ! -name 'original-*' | head -n1)
+          echo "Resolved shaded JAR: $JAR"
+          cp "$JAR" dist/app/quarry-vision.jar || { echo "No shaded JAR found"; exit 1; }
           cp src/main/resources/application.yaml dist/config/
           if [ -f .github/dist/run.bat ]; then
             cp .github/dist/run.bat dist/
