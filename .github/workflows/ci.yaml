@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4           # 1) берет код из репо
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4         # 2) ставит JDK 17 (Temurin) и вкл. кеш maven
         with:
           distribution: temurin

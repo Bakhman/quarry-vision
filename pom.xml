@@ -106,12 +106,18 @@
                 <version>4.9.10</version>
                 <executions>
                     <execution>
+                        <id>git-info</id>
+                        <phase>initialize</phase>
                         <goals>
                             <goal>revision</goal>
                         </goals>
                     </execution>
                 </executions>
                 <configuration>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <generateGitPropertiesFilename>
+                        ${project.build.outputDirectory}/git.properties
+                    </generateGitPropertiesFilename>
                     <failOnNoGitDirectory>false</failOnNoGitDirectory>
                 </configuration>
             </plugin>
