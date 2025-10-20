@@ -27,13 +27,16 @@ jobs:
         run: |
           set -e
           mkdir -p dist/app dist/config
-          JAR=$(find target -maxdepth 1 -type f -name 'quarry-vision-*-SNAPSHOT.jar' ! -name 'original-*' | head -n1)
-          echo "Resolved shaded JAR: $JAR"
-          cp "$JAR" dist/app/quarry-vision.jar || { echo "No shaded JAR found"; exit 1; }
+          JAR=$(python3 - <<'PY'
+          import glob, os, sys
+          c=[p for p in glob.glob('target/quarry-vision-*.jar') if not os.path.basename(p).startswith('original-')]
+          if not c: sys.exit(1)
+          print(max(c, key=os.path.getmtime))
+          PY
+          )
+          cp "$JAR" dist/app/quarry-vision.jar
           cp src/main/resources/application.yaml dist/config/
-          if [ -f .github/dist/run.bat ]; then
-            cp .github/dist/run.bat dist/
-          fi
+          if [ -f .github/dist/run.bat ] && cp .github/dist/run.bat dist/
 
       - name: Bundle Liberica JRE 21 Full (Windows)
         shell: pwsh
