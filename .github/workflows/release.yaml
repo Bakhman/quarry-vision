@@ -27,7 +27,7 @@ jobs:
         run: |
           set -e
           mkdir -p dist/app dist/config
-          JAR=$(python3 - c "import glob,os,sys; c=[p for p in glob.glob('target/quarry-vision-*.jar') if not os.path.basename(p).startswith('original-')]; sys.exit(1) if not c else print(max(c, key=os.path.getmtime))")
+          JAR=$(python3 -c "import glob,os,sys; c=[p for p in glob.glob('target/quarry-vision-*.jar') if not os.path.basename(p).startswith('original-')]; sys.exit(1) if not c else print(max(c, key=os.path.getmtime))")
           echo "Resolved shaded JAR: $JAR"
           cp "$JAR" dist/app/quarry-vision.jar
           cp src/main/resources/application.yaml dist/config/
