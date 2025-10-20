@@ -27,16 +27,11 @@ jobs:
         run: |
           set -e
           mkdir -p dist/app dist/config
-          JAR=$(python3 - <<'PY'
-          import glob, os, sys
-          c=[p for p in glob.glob('target/quarry-vision-*.jar') if not os.path.basename(p).startswith('original-')]
-          if not c: sys.exit(1)
-          print(max(c, key=os.path.getmtime))
-          PY
-          )
+          JAR=$(python3 - c "import glob,os,sys; c=[p for p in glob.glob('target/quarry-vision-*.jar') if not os.path.basename(p).startswith('original-')]; sys.exit(1) if not c else print(max(c, key=os.path.getmtime))")
+          echo "Resolved shaded JAR: $JAR"
           cp "$JAR" dist/app/quarry-vision.jar
           cp src/main/resources/application.yaml dist/config/
-          if [ -f .github/dist/run.bat ] && cp .github/dist/run.bat dist/
+          [ -f .github/dist/run.bat ] && cp .github/dist/run.bat dist/
 
       - name: Bundle Liberica JRE 21 Full (Windows)
         shell: pwsh
