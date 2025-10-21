@@ -168,7 +168,7 @@
                                     <mainClass>com.quarryvision.app.Boot</mainClass>
                                     <manifestEntries>
                                         <Implementation-Title>${project.artifactId}</Implementation-Title>
-                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                        <Implementation-Version>${env.GITHUB_REF_NAME}</Implementation-Version>
                                         <Implementation-Commit>${git.commit.id.abbrev}</Implementation-Commit>
                                     </manifestEntries>
                                 </transformer>

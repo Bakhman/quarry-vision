@@ -15,6 +15,7 @@ jobs:
 
       - name: Setup Temurin JDK 17
         uses: actions/setup-java@v4
+          echo "GITHUB_REF_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
         with:
           distribution: temurin
           java-version: 17
