@@ -23,6 +23,9 @@ jobs:
       - name: Export tag name
         run: echo "GITHUB_REF_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
 
+      - name: Check env seen by Maven
+        run: mvn -q help:evaluate -Dexpression=env.GITHUB_REF_NAME -DforceStdout
+
       - name: Build fat JAR
         run: mvn -B -ntp -DskipTests clean package
 
