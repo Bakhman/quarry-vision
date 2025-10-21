@@ -14,7 +14,6 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>21.0.3</javafx.version>
-        <env.GITHUB_REF_NAME>${project.version}</env.GITHUB_REF_NAME>
     </properties>
 
     <profiles>
@@ -170,6 +169,7 @@
                                     <manifestEntries>
                                         <Implementation-Title>${project.artifactId}</Implementation-Title>
                                         <Implementation-Version>${env.GITHUB_REF_NAME}</Implementation-Version>
+                                        <!--suppress UnresolvedMavenProperty -->
                                         <Implementation-Commit>${git.commit.id.abbrev}</Implementation-Commit>
                                     </manifestEntries>
                                 </transformer>
