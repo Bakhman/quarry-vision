@@ -32,11 +32,13 @@ jobs:
       - name: Prepare dist structure
         run: |
           set -e
-          mkdir -p dist/app dist/config
+          mkdir -p dist/app dist/config dist/app/tessdata
           JAR=$(python3 -c "import glob,os,sys; c=[p for p in glob.glob('target/quarry-vision-*.jar') if not os.path.basename(p).startswith('original-')]; sys.exit(1) if not c else print(max(c, key=os.path.getmtime))")
           echo "Resolved shaded JAR: $JAR"
           cp "$JAR" dist/app/quarry-vision.jar
           cp src/main/resources/application.yaml dist/config/
+          cp src/main/resources/tessdata/eng.traineddata dist/app/tessdata/ || || echo "eng.traineddata not found"
+          cp 
           [ -f .github/dist/run.bat ] && cp .github/dist/run.bat dist/
 
       - name: Bundle Liberica JRE 21 Full (Windows)
