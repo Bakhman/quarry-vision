@@ -72,6 +72,11 @@ jobs:
           zip -r "../quarry-vision-${GITHUB_REF_NAME}.zip" .
           cd ..
 
+      - name: Generate checksums
+        run: |
+          sha256sum "quarry-vision-${GITHUB_REF_NAME}.zip" > "quarry-vision-${GITHUB_REF_NAME}.zip.sha256"
+          sha256sum target/quarry-vision-*.jar > quarry-vision-${GITHUB_REF_NAME}.jars.sha256"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -79,4 +84,6 @@ jobs:
           name: ${{ github.ref_name }}
           files: |
             quarry-vision-${{ github.ref_name }}.zip
+            quarry-vision-${{ github.ref_name}}.zip.sha256
+            quarry-vision-${{ github.ref_name}}.jars.sha256
             target/*-SNAPSHOT.jar
