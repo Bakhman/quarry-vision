@@ -38,7 +38,6 @@ jobs:
           cp "$JAR" dist/app/quarry-vision.jar
           cp src/main/resources/application.yaml dist/config/
           cp src/main/resources/tessdata/eng.traineddata dist/app/tessdata/ || echo "eng.traineddata not found"
-          cp 
           [ -f .github/dist/run.bat ] && cp .github/dist/run.bat dist/
 
       - name: Bundle Liberica JRE 21 Full (Windows)
