@@ -32,49 +32,48 @@ public class OcrService {
             this.psm = psm;
             this.oem = oem;
         }
-
-        public OcrService(Config cfg) {
-            if (!cfg.enabled) {
-                // Заглушка: инициализируем, но сразу выходим на no-op.
-                this.tess = null;
-                return;
-            }
-            File dp = new File(cfg.datapath);
-            if (!dp.exists() || !dp.isDirectory()) {
-                throw new IllegalArgumentException("tessdata path not found: " + dp.getAbsolutePath());
-            }
-            Tesseract t = new Tesseract();
-            t.setDatapath(dp.getAbsolutePath());
-            t.setLanguage(cfg.languages);
-            // Доп.параметры движка
-            // PSM/OEM
-            t.setPageSegMode(cfg.psm);
-            t.setOcrEngineMode(cfg.oem);
-            this.tess = t;
+    }
+    public OcrService(Config cfg) {
+        if (!cfg.enabled) {
+            // Заглушка: инициализируем, но сразу выходим на no-op.
+            this.tess = null;
+            return;
         }
-
-        /** Простой OCR всего изображения. Возвращает trimmed-текст без внутренних переводов строк */
-        public Optional<String> readText(BufferedImage image) {
-            if (tess == null || image == null) return Optional.empty();
-            try {
-                String raw = tess.doOCR(image);
-                if (raw == null) return Optional.empty();
-                String norm = raw.replace('\n', ' ').replace('\r', ' ').trim();
-                return norm.isEmpty() ? Optional.empty() : Optional.of(norm);
-            } catch (TesseractException e) {
-                return Optional.empty();
-            }
+        File dp = new File(cfg.datapath);
+        if (!dp.exists() || !dp.isDirectory()) {
+            throw new IllegalArgumentException("tessdata path not found: " + dp.getAbsolutePath());
         }
+        Tesseract t = new Tesseract();
+        t.setDatapath(dp.getAbsolutePath());
+        t.setLanguage(cfg.languages);
+        // Доп.параметры движка
+        // PSM/OEM
+        t.setPageSegMode(cfg.psm);
+        t.setOcrEngineMode(cfg.oem);
+        this.tess = t;
+    }
 
-        /** Временная утилита для локальной проверки из файла. */
-        public Optional<String> readText(File imageFile) {
-            if (tess == null || imageFile == null) return Optional.empty();
-            try {
-                BufferedImage img = ImageIO.read(imageFile);
-                return readText(img);
-            } catch (Exception e) {
-                return Optional.empty();
-            }
+    /** Простой OCR всего изображения. Возвращает trimmed-текст без внутренних переводов строк */
+    public Optional<String> readText(BufferedImage image) {
+        if (tess == null || image == null) return Optional.empty();
+        try {
+            String raw = tess.doOCR(image);
+            if (raw == null) return Optional.empty();
+            String norm = raw.replace('\n', ' ').replace('\r', ' ').trim();
+            return norm.isEmpty() ? Optional.empty() : Optional.of(norm);
+        } catch (TesseractException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** Временная утилита для локальной проверки из файла. */
+    public Optional<String> readText(File imageFile) {
+        if (tess == null || imageFile == null) return Optional.empty();
+        try {
+            BufferedImage img = ImageIO.read(imageFile);
+            return readText(img);
+        } catch (Exception e) {
+            return Optional.empty();
         }
     }
 }
