@@ -14,6 +14,8 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>21.0.3</javafx.version>
+        <!-- OCR(optical character recognition) -->
+        <tess4j.version>5.11.0</tess4j.version>
     </properties>
 
     <profiles>
@@ -95,6 +97,13 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
             <version>10.17.0</version>
+        </dependency>
+
+        <!-- OCR: Tess4J (Tesseract wrapper) -->
+        <dependency>
+            <groupId>net.sourceforge.tess4j</groupId>
+            <artifactId>tess4j</artifactId>
+            <version>${tess4j.version}</version>
         </dependency>
     </dependencies>
 

@@ -25,4 +25,15 @@ detect:
   nmsWindowMs: 1200   # меньше подавление соседних пиков
   mergeMs: 2500        # события ближе этого окна считаем одной погрузкой
   trace: true
+# OCR (Tesseract / Tess4J)
+ocr:
+  enabled: true
+  # Путь к каталогу с *.traineddata. Можно абсолютный или относительный
+  datapath: "./tessdata"
+  # Список языков через '+', напр. "eng+rus"
+  languages: "eng"
+  # Уровень Page Segmentation Mode (PSM). 7 -- одна строка текста.
+  psm: 7
+  # OEM: 1 -- LSTM only, 3 -- default (поиск лучшего)
+  oem: 3
 
