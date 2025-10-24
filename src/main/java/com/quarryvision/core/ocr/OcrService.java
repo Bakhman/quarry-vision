@@ -2,10 +2,11 @@ package com.quarryvision.core.ocr;
 
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,7 +16,8 @@ import java.util.Optional;
  * Инициализация через datapath (каталог tessdata) и languages (напр. "eng" или "eng+rus")
  * На этом этапе работаем с BufferedImage. Конвертацию из OpenCV Mat добавим на шаге интеграции с детекцией.
  */
-public class OcrService {
+public final class OcrService {
+    private static final Logger log = LoggerFactory.getLogger(OcrService.class);
     private final Tesseract tess;
 
     public static final class Config {
@@ -37,6 +39,7 @@ public class OcrService {
         if (!cfg.enabled) {
             // Заглушка: инициализируем, но сразу выходим на no-op.
             this.tess = null;
+            log.info("OCR: disabled in config");
             return;
         }
         File dp = new File(cfg.datapath);
@@ -51,6 +54,8 @@ public class OcrService {
         t.setPageSegMode(cfg.psm);
         t.setOcrEngineMode(cfg.oem);
         this.tess = t;
+        log.info("OCR: initialized datapath={} languages={} psm={} oem={}",
+                dp.getAbsolutePath(), cfg.languages, cfg.psm, cfg.oem);
     }
 
     /** Простой OCR всего изображения. Возвращает trimmed-текст без внутренних переводов строк */
@@ -62,6 +67,7 @@ public class OcrService {
             String norm = raw.replace('\n', ' ').replace('\r', ' ').trim();
             return norm.isEmpty() ? Optional.empty() : Optional.of(norm);
         } catch (TesseractException e) {
+            log.warn("OCR: doOCR failed: {}", e.toString());
             return Optional.empty();
         }
     }
