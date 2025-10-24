@@ -3,6 +3,7 @@ package com.quarryvision.app;
 import com.quarryvision.core.db.Pg;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
+import com.quarryvision.core.ocr.OcrService;
 import com.quarryvision.ui.MainController;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -45,6 +46,9 @@ public class Boot extends Application {
 
         // опциональный ingest-тест: по флагу --ingest[=path] или -Dqv.ingestTest=true
         List<String> args = getParameters().getRaw();
+
+        // опциональная смок-инициализация OCR: -Dqv.ocr.init=true
+
     }
 
     private static void startIngestIfRequested(Config cfg, List<String> args) {
@@ -81,5 +85,20 @@ public class Boot extends Application {
         var svc = new UsbIngestService(proc, cfg.imp().patterns());
         int n = svc.scanAndIngest(usbRoot);
         System.out.println("Ingest complete. New files: " + n);
+    }
+
+    /** Одноразовая смок-инициализация OCR по системным свойствам, без зависимости от структуры Config. */
+    private static void initOcrIfRequested() {
+        if (!Boolean.getBoolean("qv.ocr.init")) return;
+        try {
+            String datapath = System.getProperty("qv.ocr.datapath", "./tessdata");
+            String langs    = System.getProperty("qv.ocr.languages", "eng");
+            int psm         = Integer.getInteger("qv.ocr.psm", 7);
+            int oem         = Integer.getInteger("qv.ocr.oem", 3);
+            new OcrService(new OcrService.Config(true, datapath, langs, psm, oem));
+            System.out.println("OCR: initialized datapath=" + datapath + " languages=" + langs + " psm=" + psm + " oem=" + oem);
+        } catch (Throwable t) {
+            System.out.println("OCR: init failed: " + t);
+        }
     }
 }
