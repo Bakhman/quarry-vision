@@ -94,11 +94,11 @@ public class MainController {
                 try {
                     var dc = cfg.detection();
                     var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
-                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), dc.mergeMs(),
+                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), resolveMergeMs(cfg),
                             dc.emaAlpha(), dc.thrLowFactor(), dc.minActiveMs(), dc.nmsWindowMs(), dc.trace());
                     var res = det.detect(p);
                     int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
-                    int detId = Pg.insertDetection(videoId, dc.mergeMs(), res.timestampsMs());
+                    int detId = Pg.insertDetection(videoId, det.effectiveMergeMs(), res.timestampsMs());
                     Platform.runLater(() -> {
                         log.appendText(String.format("Detect: %s ...%n", src));
                         log.appendText(String.format("Saved detection id=%d videoId=%d events=%d%n",
@@ -241,7 +241,7 @@ public class MainController {
                             dc.cooldownFrames(),
                             dc.minChangedPixels(),
                             new Size(dc.morphW(), dc.morphH()),
-                            dc.mergeMs(),
+                            resolveMergeMs(cfg),
                             dc.emaAlpha(),
                             dc.thrLowFactor(),
                             dc.minActiveMs(),
@@ -372,7 +372,7 @@ public class MainController {
                 onProgress.accept(85);
 
                 // 4) mergeMs — с учётом системного свойства (-Dqv.mergeMs)
-                int mergeMs = Integer.getInteger("qv.mergeMs", cfg.detection().mergeMs());
+                int mergeMs = det.effectiveMergeMs();
 
                 // 5) Сохраняем детекцию и события
                 int detId = Pg.insertDetection(videoId, mergeMs, dr.timestampsMs());
@@ -1208,5 +1208,10 @@ public class MainController {
             exec.shutdownNow();
             exec.awaitTermination(2, TimeUnit.SECONDS);
         } catch (Throwable ignore) {}
+    }
+
+    /** Возвращает effective mergeMs: -Dqv.mergeMs приоритетнее YAML. */
+    private static int resolveMergeMs(Config cfg) {
+        return Integer.getInteger("qv.mergeMs", cfg.detection().mergeMs());
     }
 }

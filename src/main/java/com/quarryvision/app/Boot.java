@@ -9,7 +9,9 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 // JavaFX Application (main)
@@ -48,7 +50,7 @@ public class Boot extends Application {
         List<String> args = getParameters().getRaw();
 
         // опциональная смок-инициализация OCR: -Dqv.ocr.init=true
-
+        initOcrIfRequested();
     }
 
     private static void startIngestIfRequested(Config cfg, List<String> args) {
@@ -89,12 +91,22 @@ public class Boot extends Application {
 
     /** Одноразовая смок-инициализация OCR по системным свойствам, без зависимости от структуры Config. */
     private static void initOcrIfRequested() {
-        if (!Boolean.getBoolean("qv.ocr.init")) return;
+        boolean flag = Boolean.getBoolean("qv.ocr.init");
+        // default: prefer ./tessdata (релиз), else src/main/resources/tessdata (dev)
+        String defaultDatapath;
+        if (Files.isDirectory(Path.of("tessdata"))) {
+            defaultDatapath = "tessdata";
+        } else if (Files.isDirectory(Path.of("src/main/resources/tessdata"))) {
+            defaultDatapath= "src/main/resources/tessdata";
+        } else {
+            defaultDatapath = "tessdata";
+        }
+        String datapath = System.getProperty("qv.ocr.datapath", defaultDatapath);
+        String langs    = System.getProperty("qv.ocr.languages", "eng");
+        int psm         = Integer.getInteger("qv.ocr.psm", 7);
+        int oem         = Integer.getInteger("qv.ocr.oem", 3);
+        if (!flag) return;
         try {
-            String datapath = System.getProperty("qv.ocr.datapath", "./tessdata");
-            String langs    = System.getProperty("qv.ocr.languages", "eng");
-            int psm         = Integer.getInteger("qv.ocr.psm", 7);
-            int oem         = Integer.getInteger("qv.ocr.oem", 3);
             new OcrService(new OcrService.Config(true, datapath, langs, psm, oem));
             System.out.println("OCR: initialized datapath=" + datapath + " languages=" + langs + " psm=" + psm + " oem=" + oem);
         } catch (Throwable t) {
