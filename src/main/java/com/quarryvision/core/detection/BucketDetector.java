@@ -286,6 +286,10 @@ public final class BucketDetector {
 
     }
 
+    public int effectiveMergeMs() {
+        return Integer.getInteger("qv.mergeMs", this.mergeMs);
+    }
+
     private static void release(Mat... mats) {
         for (Mat m : mats) if (m != null) m.release();
     }

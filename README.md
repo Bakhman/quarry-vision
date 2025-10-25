@@ -119,11 +119,28 @@ src/main/resources/
 
 Пример: изменить время слияния событий ковша (`mergeMs`):
 
-```bash
+```bash  
+    
 mvn -q exec:java \
   -Dexec.mainClass="com.quarryvision.app.Boot" \
   -Dexec.jvmArgs=-Dqv.mergeMs=4000
+```  
+
+  
+   
+```bash
+
+mvn -q -DskipTests -Dqv.mergeMs=17000 exec:java -Dexec.mainClass=com.quarryvision.app.Boot
+
 ```
+
+```bash
+
+mvn -q -DskipTests -Dqv.ocr.init=true exec:java -Dexec.mainClass=com.quarryvision.app.Boot
+
+```
+
+
 
 Приоритет:
 1. Свойства `-D...` (самый высокий).
