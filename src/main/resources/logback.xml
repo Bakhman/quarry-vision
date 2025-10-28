@@ -24,4 +24,6 @@
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </root>
+    <!-- детальный лог OCR-ROI -->
+    <logger name="com.quarryvision.core.detection" level="DEBUG"/>
 </configuration>

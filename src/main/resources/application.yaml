@@ -15,23 +15,24 @@ import:
 detect:
   stepFrames: 15
   diffThreshold: 45
-  eventRatio: 0.18
+  eventRatio: .16
+
   cooldownFrames: 150
   minChangedPixels: 35000
-  morphKernel: { w: 3, h: 3}
+  morphKernel: { w: 1.5, h: 1.5}
   emaAlpha: 0.45       # быстрее падение EMA
   thrLowFactor: 0.96   # раньше выходим из ACTIVE
-  minActiveMs: 900      # не резать слишком коротко
-  nmsWindowMs: 1200   # меньше подавление соседних пиков
+  minActiveMs: 300      # не резать слишком коротко
+  nmsWindowMs: 700   # меньше подавление соседних пиков
   mergeMs: 2500        # события ближе этого окна считаем одной погрузкой
-  trace: true
+  trace: false
 # OCR (Tesseract / Tess4J)
 ocr:
   enabled: true
   # Путь к каталогу с *.traineddata. Можно абсолютный или относительный
   datapath: "./tessdata"
   # Список языков через '+', напр. "eng+rus"
-  languages: "eng"
+  languages: "eng+rus"
   # Уровень Page Segmentation Mode (PSM). 7 -- одна строка текста.
   psm: 7
   # OEM: 1 -- LSTM only, 3 -- default (поиск лучшего)

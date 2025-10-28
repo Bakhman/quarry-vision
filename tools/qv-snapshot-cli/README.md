@@ -27,8 +27,8 @@ java -jar target/qv-snapshot-cli.jar \
   --sql="select v.path, e.t_ms, e.detection_id, e.id
          from events e
          join detections d on d.id=e.detection_id
-         join videos v on v.id=d.video_id
-         where e.detection_id=121 order by e.id"
+         join videos v on v.id=d.video_id"
+#         where e.detection_id=121 order by e.id"
 ```
 
 ---
