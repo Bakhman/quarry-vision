@@ -140,6 +140,29 @@ mvn -q -DskipTests -Dqv.ocr.init=true exec:java -Dexec.mainClass=com.quarryvisio
 
 ```
 
+# OCR TEST
+```bash
+mvn -q -DskipTests \
+-Dqv.ocr.init=true \
+-Dqv.ocr.datapath=src/main/resources/tessdata \
+-Dqv.ocr.languages=eng \
+-Dqv.ocr.psm=7  \
+-Dqv.mergeMs=7000 \
+exec:java -Dexec.mainClass=com.quarryvision.app.Boot   
+```
+```bash
+mvn -q -DskipTests clean compile \
+-Dqv.ocr.init=true   \
+-Dqv.ocr.minContrast=0.08   -Dqv.ocr.fillMin=0.005   -Dqv.ocr.fillMax=0.94 \
+-Dqv.ocr.adaptBlock=31 -Dqv.ocr.adaptC=5 \
+-Dqv.ocr.adaptBlock2=41 -Dqv.ocr.adaptC2=2 \
+-Dqv.ocr.datapath=src/main/resources/tessdata \
+exec:java -Dexec.mainClass=com.quarryvision.app.Boot
+
+```
+
+
+
 
 
 Приоритет:

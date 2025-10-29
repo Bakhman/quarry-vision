@@ -1,7 +1,9 @@
 package com.quarryvision.core.ocr;
 
+import net.sourceforge.tess4j.ITessAPI;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+import net.sourceforge.tess4j.Word;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +18,7 @@ import java.util.Optional;
  * Инициализация через datapath (каталог tessdata) и languages (напр. "eng" или "eng+rus")
  * На этом этапе работаем с BufferedImage. Конвертацию из OpenCV Mat добавим на шаге интеграции с детекцией.
  */
-public final class OcrService {
+public final class OcrService implements OcrEngine {
     private static final Logger log = LoggerFactory.getLogger(OcrService.class);
     private final Tesseract tess;
 
@@ -49,10 +51,19 @@ public final class OcrService {
         Tesseract t = new Tesseract();
         t.setDatapath(dp.getAbsolutePath());
         t.setLanguage(cfg.languages);
-        // Доп.параметры движка
         // PSM/OEM
         t.setPageSegMode(cfg.psm);
         t.setOcrEngineMode(cfg.oem);
+        // узкий алфавит и отключение словарей + DPI для стабильности
+
+        t.setVariable("tessedit_char_whitelist", "ABEKMHOPCTYX0123456789");
+        t.setVariable("load_system_dawg", "F");
+        t.setVariable("load_freq_dawg", "F");
+        t.setVariable("user_defined_dpi", "300");
+        t.setVariable("preserve_interword_spaces", "1");
+
+
+
         this.tess = t;
         log.info("OCR: initialized datapath={} languages={} psm={} oem={}",
                 dp.getAbsolutePath(), cfg.languages, cfg.psm, cfg.oem);
@@ -73,11 +84,31 @@ public final class OcrService {
     }
 
     /** Временная утилита для локальной проверки из файла. */
+    @Override
     public Optional<String> readText(File imageFile) {
         if (tess == null || imageFile == null) return Optional.empty();
         try {
             BufferedImage img = ImageIO.read(imageFile);
             return readText(img);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /** Возвращает самый уверенный токен [A-Z0-9]{3,10}. */
+    @Override
+    public Optional<String> readBestToken(BufferedImage bi) {
+        try {
+            var words = tess.getWords(bi, ITessAPI.TessPageIteratorLevel.RIL_WORD);
+            String best = null; int conf = -1;
+            for (Word w : words) {
+                String s = w.getText();
+                if (s == null) continue;
+                String norm = s.toUpperCase().replaceAll("[^A-Z0-9]", "");
+                if (norm.length() < 3 || norm.length() > 10) continue;
+                if (w.getConfidence() > conf) { conf = (int) w.getConfidence(); best = norm; }
+            }
+            return Optional.ofNullable(best);
         } catch (Exception e) {
             return Optional.empty();
         }

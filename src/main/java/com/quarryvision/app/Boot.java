@@ -11,7 +11,6 @@ import javafx.stage.Stage;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 // JavaFX Application (main)
