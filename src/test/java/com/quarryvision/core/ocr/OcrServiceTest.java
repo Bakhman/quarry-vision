@@ -23,14 +23,15 @@ class OcrServiceTest {
         assertTrue(Files.isDirectory(Path.of("src/main/resources/tessdata")));
 
         System.setProperty("qv.ocr.lang", "eng+rus");
-        System.setProperty("qv.ocr.psm", "7");    // узкая строка
-        System.setProperty("qv.ocr.oem", "1");    // LSTM only
+        System.setProperty("qv.ocr.psm", "8");    // слово/номер как единый токен
+        System.setProperty("qv.ocr.oem", "3");    // default/best
+        System.setProperty("qv.ocr.minConf", "0");    // снять порог в тестах
         System.setProperty("qv.ocr.whitelist", "ABEKMHOPCTYXАВЕКМНОРСТУХ0123456789");
 
         svc = new OcrService(new OcrService.Config(true, dp,
                         System.getProperty("qv.ocr.lang"),
-                        Integer.getInteger("qv.ocr.psm", 7),
-                        Integer.getInteger("qv.ocr.oem", 1)));
+                        Integer.getInteger("qv.ocr.psm", 8),
+                        Integer.getInteger("qv.ocr.oem", 3)));
         try {
             norm = Class.forName("com.quarryvision.core.detection.BucketDetector")
                     .getDeclaredMethod("normalizePlate", String.class);

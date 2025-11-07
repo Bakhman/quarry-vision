@@ -20,11 +20,12 @@ public class RoiScanSmokeTest {
     @BeforeAll
     static void init() throws Exception {
         System.setProperty("qv.ocr.lang", "eng+rus");
-        System.setProperty("qv.ocr.psm", "7");
-        System.setProperty("qv.ocr.oem", "1");
+        System.setProperty("qv.ocr.psm", "8");
+        System.setProperty("qv.ocr.oem", "3");
+        System.setProperty("qv.ocr.minConf", "0");
         System.setProperty("qv.ocr.whitelist", "ABEKMHOPCTYXАВЕКМНОРСТУХ0123456789");
         String dp = System.getProperty("qv.ocr.tessdataDir", "src/main/resources/tessdata");
-        svc = new OcrService(new OcrService.Config(true, dp, "eng+rus", 7,1));
+        svc = new OcrService(new OcrService.Config(true, dp, "eng+rus", 8,3));
         norm = BucketDetector.class.getDeclaredMethod("normalizePlate", String.class);
         norm.setAccessible(true);
     }
