@@ -473,29 +473,203 @@ public final class BucketDetector {
 
     private static int clamp(int v, int lo, int hi){ return Math.max(lo, Math.min(hi, v)); }
 
-    /** Пробует привести строку к шаблону госномера: LLDDDDLL. Возвращает null, если не удалось. */
+    // Управление: включать ли регион в результат нормализации, default=false
+    private static final boolean INCLUDE_REGION = Boolean.getBoolean("qv.ocr.includeRegion");
+    /** Пробует привести строку к шаблону госномера.
+     * Поддержка ru: LDDDLL[region], где L ∈ {А,В,Е,К,М,Н,О,Р,С,Т,У,Х} (кириллица или латиница-двойник).
+     * Возвращает канонический латинский вид, например: "О793РР" или "О793РР123" */
     private static String normalizePlate(String s) {
         if (s == null || s.isEmpty()) return null;
-        // две гипотезы: «буквенная» и «цифровая», учитывая похожие символы
-        String lettersBias = s.replace('0', 'O').replace('1', 'I').replace('5', 'S').replace('2', 'Z').replace('8', 'B');
-        String digitsBias  = s.replace('O','0').replace('I','1').replace('S','5').replace('Z','2').replace('B','8');
-        // пробуем найти LLDDDDLL
-        String p = extractPattern(lettersBias);
-        if (p != null) return p;
-        return extractPattern(digitsBias);
+        // 0) базовая нормализация регистра + кириллицы
+        String base = translitRuPlateLettersToLatin(s.toUpperCase());
+
+        // 1) две гипотезы путаниц:
+        //    a) буквенная: цифры, похожие на буквы → буквы (0→O,1→I,5→S,2→Z,8→B)
+        String lettersBias = base
+                .replace('0','O').replace('1','I').replace('5','S').replace('2','Z').replace('8','B');
+        //    b) цифровая: буквы, похожие на цифры → цифры (O→0,I→1,S→5,Z→2,B→8)
+        String digitsBias = base
+                .replace('O','0').replace('I','1').replace('S','5').replace('Z','2').replace('B','8');
+
+        // 2) СНАЧАЛА пробуем чистый generic на исходной строке
+        String p;
+        if ((p = extractGenericPlate(base))  != null) return p;
+        // затем RU на исходной и цифровой
+        if ((p = extractRuPlate(base))       != null) return p;
+        if ((p = extractRuPlate(digitsBias)) != null) return p;
+
+        // 3) generic на bias-вариантах
+        if ((p = extractGenericPlate(lettersBias)) != null) return p;
+        if ((p = extractGenericPlate(digitsBias))  != null) return p;
+
+        return null;
     }
 
-    private static String extractPattern(String s) {
-        // ищем непрерывно: 2 буквы, 4 цифры, 2 буквы
-        for (int i = 0; i + 8 <= s.length(); i++) {
-            String sub = s.substring(i, i + 8);
-            if (sub.substring(0,2).matches("[A-Z]{2}")
-                    && sub.substring(2,6).matches("\\d{4}")
-                    && sub.substring(6,8).matches("[A-Z]{2}")) {
-                return sub;
+    /** Транслитерация разрешённых кириллических букв к латинским двойникам. Остальное оставляем как есть. */
+    private static String translitRuPlateLettersToLatin(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            // кириллица → латиница-двойник
+            switch (s.charAt(i)) {
+                case 'А': sb.append('A'); break;
+                case 'В': sb.append('B'); break;
+                case 'Е': sb.append('E'); break;
+                case 'К': sb.append('K'); break;
+                case 'М': sb.append('M'); break;
+                case 'Н': sb.append('H'); break;
+                case 'О': sb.append('O'); break;
+                case 'Р': sb.append('P'); break;
+                case 'С': sb.append('C'); break;
+                case 'Т': sb.append('T'); break;
+                case 'У': sb.append('Y'); break;
+                case 'Х': sb.append('X'); break;
+                default:  sb.append(s.charAt(i));
+            }
+        }
+        return sb.toString();
+    }
+
+    /** RU-шаблон: L D D D L L [D{2,3}] с позиционной нормализацией. По умолчанию регион отбрасываем. */
+    private static String extractRuPlate(String s) {
+        // сканируем окно от длины 6 до 9
+        for (int i = 0; i + 6 <= s.length(); i++) {
+            // базовая часть: L D D D L L
+            char c0 = toRuLetterSlot(safe(s, i));
+            char c1 = toDigitSlot(safe(s, i+1));
+            char c2 = toDigitSlot(safe(s, i+2));
+            char c3 = toDigitSlot(safe(s, i+3));
+            char c4 = toRuLetterSlot(safe(s, i+4));
+            char c5 = toRuLetterSlot(safe(s, i+5));
+            if (c0!=0 && c1!=0 && c2!=0 && c3!=0 && c4!=0 && c5!=0) {
+                // регион: 2 или 3 цифры, опционально
+                String core = "" + c0+c1+c2+c3+c4+c5;
+                if (!INCLUDE_REGION) return core;
+                char ch6 = toDigitSlot(safe(s,i+6));
+                char ch7 = toDigitSlot(safe(s,i+7));
+                char ch8 = toDigitSlot(safe(s,i+8));
+                if (ch6!=0 && ch7!=0 && ch8!=0) return core + ch6 + ch7 + ch8;
+                if (ch6!=0 && ch7!=0) return core + ch6 + ch7;
+                return core;
             }
         }
         return null;
+    }
+
+    /** Общий шаблон: LL DDDD LL с позиционной нормализацией по слотам. */
+    private static String extractGenericPlate(String s) {
+        for (int i = 0; i + 8 <= s.length(); i++) {
+            char L0 = toLatLetterSlotGeneric(safe(s,i));
+            char L1 = toLatLetterSlotGeneric(safe(s,i+1));
+            char D2 = toDigitSlotGeneric(safe(s,i+2));
+            char D3 = toDigitSlotGeneric(safe(s,i+3));
+            char D4 = toDigitSlotGeneric(safe(s,i+4));
+            char D5 = toDigitSlotGeneric(safe(s,i+5));
+            char L6 = toLatLetterSlotGenericTail1(safe(s,i+6));
+            char L7 = toLatLetterSlotGenericTail2(safe(s,i+7));
+            if (L0!=0 && L1!=0 && D2!=0 && D3!=0 && D4!=0 && D5!=0 && L6!=0 && L7!=0) {
+                return ""+L0+L1+D2+D3+D4+D5+L6+L7;
+            }
+        }
+        return null;
+    }
+
+    /** Разрешённые буквы для RU (латинские двойники): A B E K M H O P C T Y X */
+    private static final String RU_LAT_SET = "ABEKMHOPCTYX";
+    private static boolean isDigit(char c) { return c >= '0' && c <= '9'; }
+    private static boolean isRuLatLetter(char c) { return RU_LAT_SET.indexOf(c) > 0; }
+    private static char safe(String s, int i) { return i < s.length() ? s.charAt(i) : '\0'; }
+
+    /** Слот букв RU: кириллица→латиница, цифры-похожие→буквы; возвращает 0 если неподходящее. */
+    private static char toRuLetterSlot(char ch) {
+        if (ch == '\0') return 0;
+        // кириллица → латиница
+        switch (ch) {
+            case 'А' -> ch='A';
+            case 'В' -> ch='B';
+            case 'Е' -> ch='E';
+            case 'К' -> ch='K';
+            case 'М' -> ch='M';
+            case 'Н' -> ch='H';
+            case 'О' -> ch='O';
+            case 'Р' -> ch='P';
+            case 'С' -> ch='C';
+            case 'Т' -> ch='T';
+            case 'У' -> ch='Y';
+            case 'Х' -> ch='X';
+        }
+        // цифры, похожие на буквы
+        if (ch=='\0') ch='O';
+        else if (ch=='1') ch='I';
+        else if (ch=='5') ch='S';
+        else if (ch=='2') ch='Z';
+        else if (ch=='8') ch='B';
+        return isRuLatLetter(ch) ? ch : 0;
+    }
+
+
+    /** Слот цифры 0–9 с коррекцией похожих букв. */
+    private static char toDigitSlot(char ch) {
+        if (ch=='\0') return 0;
+        // Частые OCR-подмены в размытых кадрах:
+        // O→0, I→1, S→5, Z→2, B→8 уже были.
+        // Дополнительно: E→6 (плоский шрифт), A→1 (тонкий шрифт/пересвет).
+        if (ch=='O') ch='0';
+        else if (ch=='I') ch='1';
+        else if (ch=='S') ch='5';
+        else if (ch=='Z') ch='2';
+        else if (ch=='B') ch='8';
+        else if (ch=='E') ch='6';
+        else if (ch=='A') ch='1';
+        return isDigit(ch) ? ch : 0;
+    }
+
+    /** Буквенный слот (общий) для generic LLDDDDLL: 0→O, 1→I, 5→S, 2→Z, 8→B, 4→A. */
+    private static char toLatLetterSlotGeneric(char ch) {
+        if (ch=='\0') return 0;
+        if (ch=='0') ch='O';
+        else if (ch=='1') ch='I';
+        else if (ch=='5') ch='S';
+        else if (ch=='2') ch='Z';
+        else if (ch=='4') ch='A';
+        else if (ch == '8') ch = 'B'; // дефолтно 8→B (исключение — хвост)
+        return (ch >= 'A' && ch <= 'Z') ? ch : 0;
+    }
+
+   /** Хвостовая буква #1 (L6): допускаем 8→A. */
+   private static char toLatLetterSlotGenericTail1(char ch) {
+       if (ch == '\0') return 0;
+       if (ch == '0') ch = 'O';
+       else if (ch == '1') ch = 'I';
+       else if (ch == '5') ch = 'S';
+       else if (ch == '2') ch = 'Z';
+       else if (ch == '4') ch = 'A';
+       else if (ch == '8') ch = 'A'; // ключевая разница
+       return (ch >= 'A' && ch <= 'Z') ? ch : 0;
+   }
+
+   /** Хвостовая буква #2 (L7): допускаем 8→O. */
+   private static char toLatLetterSlotGenericTail2(char ch) {
+       if (ch == '\0') return 0;
+       if (ch == '0') ch = 'O';
+       else if (ch == '1') ch = 'I';
+       else if (ch == '5') ch = 'S';
+       else if (ch == '2') ch = 'Z';
+       else if (ch == '4') ch = 'A';
+       else if (ch == '8') ch = 'O'; // ключевая разница
+       return (ch >= 'A' && ch <= 'Z') ? ch : 0;
+   }
+
+    /** Цифровой слот для generic LLDDDDLL: O→0, I→1, S→5, Z→2, B→8, E→6, A→4. */
+    private static char toDigitSlotGeneric(char ch){
+        if (ch=='\0') return 0;
+        if (ch=='O') ch='0';
+        else if (ch=='I') ch='1';
+        else if (ch=='S') ch='5';
+        else if (ch=='Z') ch='2';
+        else if (ch=='B') ch='8';
+        else if (ch=='E') ch='6';
+        else if (ch=='A') ch='4';
+        return isDigit(ch) ? ch : 0;
     }
 
     public int effectiveMergeMs() {

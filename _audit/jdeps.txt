@@ -1,0 +1,16 @@
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.base
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.datatransfer
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.desktop
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.logging
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.management
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.naming
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.prefs
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.scripting
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.security.jgss
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.security.sasl
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.sql
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.transaction.xa
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> java.xml
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> jdk.jfr
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> jdk.unsupported
+quarry-vision-1.2.12-SNAPSHOT-shaded.jar -> not found

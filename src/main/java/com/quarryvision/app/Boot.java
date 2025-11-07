@@ -8,6 +8,8 @@ import com.quarryvision.ui.MainController;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,11 +17,19 @@ import java.util.List;
 
 // JavaFX Application (main)
 public class Boot extends Application {
-
+    static Logger log = LoggerFactory.getLogger(Boot.class);
     @Override
     public void start(Stage stage) {
         Config cfg = Config.load();
-        System.out.println("Inbox dir: " + cfg.imp().inbox());
+        var src = System.getProperty("qv.config");
+        if (src != null && !src.isBlank()) {
+            log.info("Config: qv.config={}", Path.of(src).toAbsolutePath().normalize());
+        } else if (Files.isRegularFile(Path.of("config","application.yaml"))) {
+            log.info("Config: ./config/application.yaml");
+        } else {
+            log.info("Config: classpath:/application.yaml");
+        }
+        log.info("Inbox dir: {}", cfg.imp().inbox());
         // Инициализация БД и миграций заранее
         try {
             Pg.init();

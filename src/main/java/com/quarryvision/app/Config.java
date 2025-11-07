@@ -1,10 +1,16 @@
 package com.quarryvision.app;
 
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+
 
 
 public record Config(Db db, ImportConf imp, DetectConf detection) {
@@ -18,10 +24,20 @@ public record Config(Db db, ImportConf imp, DetectConf detection) {
 
     @SuppressWarnings("unchecked")
     public static Config load() {
-        try(InputStream in = Config.class.getResourceAsStream("/application.yaml")) {
-            if (in == null) {
-                throw new IllegalStateException("application.yaml not found on classpath");
+        // порядок: -Dqv.config → ./config/application.yaml → classpath:/application.yaml
+        InputStream in = null;
+        try {
+            String override = System.getProperty("qv.config");
+            if (override != null && !override.isBlank()) {
+                Path p = Path.of(override).toAbsolutePath().normalize();
+                if (!Files.isRegularFile(p)) throw new IllegalStateException("qv.config not found: " + p);
+                in = Files.newInputStream(p);
+            } else {
+                Path p = Path.of("config", "application.yaml");
+                if (Files.isRegularFile(p)) in = Files.newInputStream(p);
             }
+            if (in == null) in = Config.class.getResourceAsStream("/application.yaml");
+            if (in == null) throw new IllegalStateException("application.yaml not found (classpath)");
             Yaml yaml = new Yaml();
             Map<String, Object> root = yaml.load(in);
 
@@ -51,6 +67,8 @@ public record Config(Db db, ImportConf imp, DetectConf detection) {
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to load application.yaml", e);
+        } finally {
+            try { if (in != null) in.close(); } catch (Exception ignore) {}
         }
     }
 }
