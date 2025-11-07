@@ -400,8 +400,8 @@ public final class BucketDetector {
         double minContrast = Double.parseDouble(System.getProperty("qv.ocr.minContrast", "0.10"));
         double fillMin     = Double.parseDouble(System.getProperty("qv.ocr.fillMin", "0.01"));
         double fillMax     = Double.parseDouble(System.getProperty("qv.ocr.fillMax", "0.90"));
-        boolean needFalback = (fill < fillMin || fill > fillMax || contrast < minContrast);
-        if (needFalback) {
+        boolean needFallback = (fill < fillMin || fill > fillMax || contrast < minContrast);
+        if (needFallback) {
             // альтернативная адаптивная бинаризация с более крупным окном
             int b2 = Integer.getInteger("qv.ocr.adaptBlock2", 41);
             int c2 = Integer.getInteger("qv.ocr.adaptC2", 2);
@@ -418,12 +418,12 @@ public final class BucketDetector {
                             String.format("%.3f", fill2), r.x(), r.y(), r.width(), r.height());
                 }
                 bin.release(); bin = bin2; fill = fill2;
-                needFalback = false;
+                needFallback = false;
             } else {
                 bin2.release();
             }
         }
-        if (needFalback) {
+        if (needFallback) {
             // Otsu как последний вариант
             Mat bin3 = new Mat();
             opencv_imgproc.threshold(up, bin3, 0, 255, opencv_imgproc.THRESH_BINARY + opencv_imgproc.THRESH_OTSU);
@@ -433,14 +433,14 @@ public final class BucketDetector {
                     log.debug("OCR fallback#2 Otsu OK (fill3={}) rect({}, {}, {}, {})",
                             String.format("%.3f", fill3), r.x(), r.y(), r.width(), r.height());
                 }
-                bin.release();; bin = bin3; fill = fill3;
-                needFalback = false;
+                bin.release(); bin = bin3; fill = fill3;
+                needFallback = false;
             } else {
                 bin3.release();
             }
 
         }
-        if (needFalback) {
+        if (needFallback) {
             if (log.isDebugEnabled()) {
                 log.debug("OCR skip after fallbacks (fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {}",
                         String.format("%.3f", fill),
@@ -461,7 +461,22 @@ public final class BucketDetector {
             BufferedImage bi = ImageIO.read(new ByteArrayInputStream(bytes));
             // сначала пробуем самый уверенный токен, потом общий текст
             String raw = ocr.readBestToken(bi).orElse(null);
-            if (raw == null) return null;
+            if (raw == null) {
+                // Fallback: инверсия бинарного изображения и повторная попытка
+                Mat binInv = new Mat();
+                opencv_core.bitwise_not(bin, binInv);
+                BytePointer buf2 = new BytePointer();
+                boolean ok2 = opencv_imgcodecs.imencode(".png", binInv, buf2);
+                if (ok2) {
+                    byte[] b2 = new byte[(int)buf2.limit()];
+                    buf2.get(b2);
+                    BufferedImage bi2 = ImageIO.read(new ByteArrayInputStream(b2));
+                    raw = ocr.readBestToken(bi2).orElse(null);
+                }
+                buf2.deallocate();
+                binInv.release();
+                if (raw == null) return null;
+            }
             return raw.trim();
         } catch (Exception ignore) {
             return null;
@@ -598,7 +613,7 @@ public final class BucketDetector {
             case 'Х' -> ch='X';
         }
         // цифры, похожие на буквы
-        if (ch=='\0') ch='O';
+        if (ch=='0') ch='O';
         else if (ch=='1') ch='I';
         else if (ch=='5') ch='S';
         else if (ch=='2') ch='Z';
