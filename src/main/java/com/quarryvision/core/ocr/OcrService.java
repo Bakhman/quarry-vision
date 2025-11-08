@@ -13,6 +13,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -140,11 +141,58 @@ public final class OcrService implements OcrEngine {
                     tess.setPageSegMode(prev);
                 }
             }
+            // Финальный fallback: общий OCR-текст с фильтрацией по whitelist
+            if (best == null || best.isBlank()) {
+                final String wl =System.getProperty("qv.ocr.whitelist",
+                        "ABEKMHOPCTYXАВЕКМНОРСТУХ0123456789");
+                String raw = safeDoOcr(prepared);
+                String cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned != null) return Optional.of(cleaned);
+                // попытка на инвертированном изображении
+                BufferedImage inv = invertBinary(prepared);
+                raw = safeDoOcr(inv);
+                cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned != null) return Optional.of(cleaned);
+            }
             return Optional.ofNullable(best);
         } catch (Exception e) {
             log.debug("OCR: best-token failed: {}", e.getMessage());
             return Optional.empty();
         }
+    }
+
+    // ---- вспомогательные ----
+    private String safeDoOcr(BufferedImage img) {
+        try {
+            String t = tess.doOCR(img);
+            return (t == null || t.isBlank()) ? null : t;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String cleanByWhitelist(String raw, String wl) {
+        if (raw == null) return null;
+        String cleaned = raw.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9А-ЯЁ]", "");
+        if (cleaned.isEmpty()) return null;
+        // если whitelist задан, требуем хотя бы одно совпадение
+        if (wl != null && !wl.isBlank()) {
+            String keepRe = "[" + wl + "]+";
+            if (!cleaned.matches(".*" + keepRe + ".*")) return null;
+        }
+        return cleaned;
+    }
+
+    private BufferedImage invertBinary(BufferedImage src) {
+        int W = src.getWidth(), H = src.getHeight();
+        BufferedImage dst = new BufferedImage(W, H, BufferedImage.TYPE_BYTE_BINARY);
+        for (int y=0; y<H; y++)
+            for (int x=0; x<W; x++) {
+                int rgb = src.getRGB(x,y);
+                int v = (rgb & 0x00FFFFFF) ==0x00FFFFFF ? 0x000000 : 0xFFFFFF;
+                dst.setRGB(x, y, (0xFF<<24) | v);
+            }
+        return dst;
     }
 
     private String bestToken(BufferedImage img) {
@@ -164,7 +212,7 @@ public final class OcrService implements OcrEngine {
         return best;
     }
 
-    /** Подготовка: серый → апскейл до minWidth=420 → контраст-stretch → Отсу. */
+    /** Подготовка: серый → апскейл до minWidth=420 → Отсу. */
     private static BufferedImage preparedForOcr(BufferedImage src) {
         int w = src.getWidth(), h = src.getHeight();
         // to grayscale
@@ -194,7 +242,7 @@ public final class OcrService implements OcrEngine {
             for (int x=0; x<W; x++) {
                 hist[scaled.getRaster().getSample(x, y, 0)]++;
             }
-        int total = W*H, sum=0; for (int t=0;t<256;t++) sum += t*hist[t];
+        int total = W*H, sum=0;
         for (int t=0;t<256;t++) sum += t*hist[t];
         int sumB=0, wB=0;
         double maxVar = -1;
@@ -216,6 +264,5 @@ public final class OcrService implements OcrEngine {
                 bin.setRGB(x, y, (0xFF<<24) | b);
             }
         return bin;
-
     }
 }
