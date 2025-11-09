@@ -174,7 +174,10 @@ public final class OcrService implements OcrEngine {
     private String cleanByWhitelist(String raw, String wl) {
         if (raw == null) return null;
         String cleaned = raw.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9А-ЯЁ]", "");
-        if (cleaned.isEmpty()) return null;
+        if (cleaned.length() < 3) return null;
+        boolean hasDigit = cleaned.chars().anyMatch(ch -> ch >= '0' && ch <= '9');
+        boolean hasLetter = cleaned.chars().anyMatch(ch -> (ch >= 'A' && ch <= 'Z') || (ch >= 'А' && ch <= 'Я') || ch=='Ё');
+        if(!hasDigit || ! hasLetter) return null;
         // если whitelist задан, требуем хотя бы одно совпадение
         if (wl != null && !wl.isBlank()) {
             String keepRe = "[" + wl + "]+";
