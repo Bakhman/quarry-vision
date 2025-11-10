@@ -123,19 +123,24 @@ public final class OcrService implements OcrEngine {
         if (tess == null || bi == null) return Optional.empty();
         try {
             BufferedImage prepared = preparedForOcr(bi);
+            // применяем whitelist и DPI перед распознаванием
+            final String wl = System.getProperty("qv.ocr.whitelist",
+                    "ABEKMHOPCTYXАВЕКМНОРСТУХ0123456789");
+            try { tess.setVariable("tessedit_char_whitelist", wl); } catch (Exception ignore) {}
+            try { tess.setVariable("user_defined_dpi", "300"); } catch (Exception ignore) {}
             String best = bestToken(prepared);
             // Fallback: если пусто ИЛИ только цифры, пробуем другой PSM
             if (best == null || best.matches("\\d+")) {
                 int prev = basePsm;
                 try {
-                    // чаще помогает PSM 8 (SINGLE_WORD) или 13 (RAW_LINE). Начнём с 8.
-                    tess.setPageSegMode(8);
-                    String alt = bestToken(prepared);
-                    if (alt != null && !alt.isBlank()) best = alt;
-                    if (best == null || best.matches("\\d+")) {
-                        tess.setPageSegMode(13);
-                        alt = bestToken(prepared);
-                        if (alt != null && !alt.isBlank()) best = alt;
+                    // свип по нескольким PSM
+                    int[] psms = new int[]{8, 7, 6, 13}; // WORD → LINE → BLOCK → RAW_LINE
+                    for (int psm : psms) {
+                        tess.setPageSegMode(psm);
+                        String alt = bestToken(prepared);
+                        if (alt != null && !alt.isBlank() && !alt.matches("\\d+")) {
+                            best = alt; break;
+                        }
                     }
                 } finally {
                     tess.setPageSegMode(prev);
@@ -143,8 +148,6 @@ public final class OcrService implements OcrEngine {
             }
             // Финальный fallback: общий OCR-текст с фильтрацией по whitelist
             if (best == null || best.isBlank()) {
-                final String wl =System.getProperty("qv.ocr.whitelist",
-                        "ABEKMHOPCTYXАВЕКМНОРСТУХ0123456789");
                 String raw = safeDoOcr(prepared);
                 String cleaned = cleanByWhitelist(raw, wl);
                 if (cleaned != null) return Optional.of(cleaned);
