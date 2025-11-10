@@ -129,6 +129,12 @@ public final class OcrService implements OcrEngine {
             try { tess.setVariable("tessedit_char_whitelist", wl); } catch (Exception ignore) {}
             try { tess.setVariable("user_defined_dpi", "300"); } catch (Exception ignore) {}
             String best = bestToken(prepared);
+            // первичная валидация best по whitelist: нужно и буквы, и цифры
+            if (best != null) {
+                String checked = cleanByWhitelist(best, wl);
+                if (checked != null) return Optional.of(checked);
+                best = null; // не прошёл фильтр → переходим к fallback
+            }
             // Fallback: если пусто ИЛИ только цифры, пробуем другой PSM
             if (best == null || best.matches("\\d+")) {
                 int prev = basePsm;
@@ -138,8 +144,9 @@ public final class OcrService implements OcrEngine {
                     for (int psm : psms) {
                         tess.setPageSegMode(psm);
                         String alt = bestToken(prepared);
-                        if (alt != null && !alt.isBlank() && !alt.matches("\\d+")) {
-                            best = alt; break;
+                        if (alt != null && !alt.isBlank()) {
+                            String checked  = cleanByWhitelist(alt, wl);
+                            if (checked != null) { best = checked; break; }
                         }
                     }
                 } finally {
