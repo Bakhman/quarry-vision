@@ -163,6 +163,20 @@ public final class OcrService implements OcrEngine {
                 raw = safeDoOcr(inv);
                 cleaned = cleanByWhitelist(raw, wl);
                 if (cleaned != null) return Optional.of(cleaned);
+            } else {
+                // Есть валидный best: проверим, не даёт ли общий OCR более длинный валидный токен
+                String raw = safeDoOcr(prepared);
+                String cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned != null && cleaned.length() > best.length()) {
+                    return Optional.of(cleaned);
+                }
+                // попробуем инверт
+                BufferedImage inv = invertBinary(prepared);
+                raw = safeDoOcr(inv);
+                cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned !=null && cleaned.length() > best.length()) {
+                    return Optional.of(cleaned);
+                }
             }
             return Optional.ofNullable(best);
         } catch (Exception e) {
