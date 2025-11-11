@@ -13,6 +13,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -129,11 +130,12 @@ public final class OcrService implements OcrEngine {
             try { tess.setVariable("tessedit_char_whitelist", wl); } catch (Exception ignore) {}
             try { tess.setVariable("user_defined_dpi", "300"); } catch (Exception ignore) {}
             String best = bestToken(prepared);
-            // первичная валидация best по whitelist: нужно и буквы, и цифры
+            java.util.List<String> candidates = new java.util.ArrayList<>();
+            // первичная валидация best по whitelist
             if (best != null) {
                 String checked = cleanByWhitelist(best, wl);
-                if (checked != null) return Optional.of(checked);
-                best = null; // не прошёл фильтр → переходим к fallback
+                if (checked != null) candidates.add(checked);
+                else best = null; // не прошёл фильтр →  fallback
             }
             // Fallback: если пусто ИЛИ только цифры, пробуем другой PSM
             if (best == null || best.matches("\\d+")) {
@@ -146,7 +148,7 @@ public final class OcrService implements OcrEngine {
                         String alt = bestToken(prepared);
                         if (alt != null && !alt.isBlank()) {
                             String checked  = cleanByWhitelist(alt, wl);
-                            if (checked != null) { best = checked; break; }
+                            if (checked != null) { candidates.add(checked); break; }
                         }
                     }
                 } finally {
@@ -154,31 +156,29 @@ public final class OcrService implements OcrEngine {
                 }
             }
             // Финальный fallback: общий OCR-текст с фильтрацией по whitelist
-            if (best == null || best.isBlank()) {
+            {
                 String raw = safeDoOcr(prepared);
                 String cleaned = cleanByWhitelist(raw, wl);
-                if (cleaned != null) return Optional.of(cleaned);
+                if (cleaned != null) candidates.add(cleaned);
                 // попытка на инвертированном изображении
                 BufferedImage inv = invertBinary(prepared);
                 raw = safeDoOcr(inv);
                 cleaned = cleanByWhitelist(raw, wl);
-                if (cleaned != null) return Optional.of(cleaned);
-            } else {
-                // Есть валидный best: проверим, не даёт ли общий OCR более длинный валидный токен
-                String raw = safeDoOcr(prepared);
-                String cleaned = cleanByWhitelist(raw, wl);
-                if (cleaned != null && cleaned.length() > best.length()) {
-                    return Optional.of(cleaned);
-                }
-                // попробуем инверт
-                BufferedImage inv = invertBinary(prepared);
-                raw = safeDoOcr(inv);
-                cleaned = cleanByWhitelist(raw, wl);
-                if (cleaned !=null && cleaned.length() > best.length()) {
-                    return Optional.of(cleaned);
-                }
+                if (cleaned != null) candidates.add(cleaned);
             }
-            return Optional.ofNullable(best);
+            // doOcr на сером апскейле
+            {
+                BufferedImage gray = upscaledGray(bi);
+                String raw = safeDoOcr(gray);
+                String cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned != null) candidates.add(cleaned);
+            }
+            // финальный выбор: самый длинный валидный
+            String chosen = candidates.stream()
+                    .filter(s -> s.length() >= 3)
+                    .max(Comparator.comparingInt(String::length))
+                    .orElse(null);
+            return Optional.ofNullable(chosen);
         } catch (Exception e) {
             log.debug("OCR: best-token failed: {}", e.getMessage());
             return Optional.empty();
@@ -210,7 +210,7 @@ public final class OcrService implements OcrEngine {
         return cleaned;
     }
 
-    private BufferedImage invertBinary(BufferedImage src) {
+    private static BufferedImage invertBinary(BufferedImage src) {
         int W = src.getWidth(), H = src.getHeight();
         BufferedImage dst = new BufferedImage(W, H, BufferedImage.TYPE_BYTE_BINARY);
         for (int y=0; y<H; y++)
@@ -220,6 +220,27 @@ public final class OcrService implements OcrEngine {
                 dst.setRGB(x, y, (0xFF<<24) | v);
             }
         return dst;
+    }
+
+    /** Серый апскейл без порога: как в preparedForOcr, но без Отсу. */
+    private BufferedImage upscaledGray(BufferedImage src) {
+        int w = src.getWidth(), h = src.getHeight();
+        BufferedImage gray = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_GRAY);
+        Graphics2D g0 = gray.createGraphics();
+        g0.drawImage(src, 0, 0, null);
+        g0.dispose();
+        int minW = 420;
+        if (w >= minW) return gray;
+        int newW = minW;
+        int newH = Math.max(1, (int)Math.round(h * (newW / (double) w)));
+        BufferedImage scaled = new BufferedImage(newW, newH, BufferedImage.TYPE_BYTE_GRAY);
+        Graphics2D g = scaled.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.drawImage(gray, 0, 0, newW, newH, null);
+        g.dispose();
+        return scaled;
     }
 
     private String bestToken(BufferedImage img) {
