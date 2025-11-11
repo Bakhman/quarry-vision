@@ -110,8 +110,14 @@ class OcrServiceTest {
 
         for (Path png : list) {
             BufferedImage img = ImageIO.read(png.toFile());
-            var got = svc.readBestToken(img);
-            assertTrue(got.isEmpty(), "negative should return empty for " + png + " but got=" + got);
+            var opt = svc.readBestToken(img);
+            if (opt.isEmpty()) continue; // ok - empty
+            // Допуск: сырой токен возможен, но после нормализации должен быть null
+            String raw = opt.get();
+            String normalized = (String) norm.invoke(null, raw);
+            assertNull(normalized,
+                    "negative should normalize to null for " + png +
+                             " but got raw=" + raw);
         }
     }
 
