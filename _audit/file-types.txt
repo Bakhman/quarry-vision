@@ -1,0 +1,63 @@
+.github/ISSUE_TEMPLATE/bug_report.md:                                        Unicode text, UTF-8 text, with CRLF line terminators
+.github/ISSUE_TEMPLATE/config.yml:                                           Unicode text, UTF-8 text, with CRLF line terminators
+.github/ISSUE_TEMPLATE/feature_request.md:                                   Unicode text, UTF-8 text, with CRLF line terminators
+.github/dist/run.bat:                                                        DOS batch file, ASCII text, with CRLF line terminators
+.github/pack/windows/run.bat:                                                DOS batch file, Unicode text, UTF-8 text, with CRLF line terminators
+.github/pull_request_template.md:                                            exported SGML document, Unicode text, UTF-8 text, with CRLF line terminators
+.github/workflows/ci.yaml:                                                   Unicode text, UTF-8 text, with CRLF line terminators
+.github/workflows/release.yaml:                                              ASCII text, with CRLF line terminators
+.github/workflows/trello-plan-apply.yaml:                                    Unicode text, UTF-8 text, with CRLF line terminators
+.github/workflows/trello-sync.yaml:                                          Unicode text, UTF-8 text, with CRLF line terminators
+.gitignore:                                                                  Unicode text, UTF-8 text, with CRLF line terminators
+.mvn/jvm.config:                                                             ASCII text, with CRLF line terminators
+.trello-sync/last-run.txt:                                                   ASCII text, with CRLF line terminators
+AUTO_MERGE_TEST.md:                                                          ASCII text, with CRLF line terminators
+CONTRIBUTING.md:                                                             Unicode text, UTF-8 text, with CRLF line terminators
+LICENSE:                                                                     ASCII text, with CRLF line terminators
+README.md:                                                                   HTML document, Unicode text, UTF-8 text, with CRLF line terminators
+TRELLO.md:                                                                   Unicode text, UTF-8 text, with CRLF line terminators
+docs/branch-naming.md:                                                       Unicode text, UTF-8 text, with CRLF line terminators
+docs/chat-handbook.md:                                                       Unicode text, UTF-8 text, with CRLF line terminators
+docs/cleanup-guide.md:                                                       Unicode text, UTF-8 text, with CRLF line terminators
+docs/mvp-vs-mvc.md:                                                          Unicode text, UTF-8 text, with CRLF line terminators
+docs/pr-checklist.md:                                                        Unicode text, UTF-8 text, with CRLF line terminators
+docs/roadmap-v1.2.md:                                                        Unicode text, UTF-8 text, with CRLF line terminators
+docs/roadmap.md:                                                             Unicode text, UTF-8 text, with CRLF line terminators
+docs/stabilization-checkpoint-v1.1.2.md:                                     Unicode text, UTF-8 text, with CRLF line terminators
+docs/trello-plan.md:                                                         Unicode text, UTF-8 text, with CRLF line terminators
+docs/user-guide.md:                                                          Unicode text, UTF-8 text, with CRLF line terminators
+pom.xml:                                                                     XML 1.0 document, Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/app/Boot.java:                                Java source, Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/app/Config.java:                              ASCII text, with CRLF line terminators
+src/main/java/com/quarryvision/core/db/DbCamera.java:                        ASCII text, with CRLF line terminators
+src/main/java/com/quarryvision/core/db/DbDailyAgg.java:                      ASCII text, with CRLF line terminators
+src/main/java/com/quarryvision/core/db/DbMergeAgg.java:                      ASCII text, with CRLF line terminators
+src/main/java/com/quarryvision/core/db/DbVideoAgg.java:                      ASCII text, with CRLF line terminators
+src/main/java/com/quarryvision/core/db/DbWeekAgg.java:                       ASCII text, with CRLF line terminators
+src/main/java/com/quarryvision/core/db/Pg.java:                              Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/detection/BucketDetector.java:           Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/detection/DetectionResult.java:          Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/importer/IngestProcessor.java:           Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/importer/UsbIngestService.java:          Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/ocr/OcrEngine.java:                      Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/ocr/OcrService.java:                     Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/queue/DetectionQueueService.java:        Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/core/queue/QueueTask.java:                    ASCII text, with CRLF line terminators
+src/main/java/com/quarryvision/core/video/CameraWorker.java:                 Unicode text, UTF-8 text, with CRLF line terminators
+src/main/java/com/quarryvision/ui/MainController.java:                       Unicode text, UTF-8 text, with CRLF line terminators
+src/main/resources/application.yaml:                                         Unicode text, UTF-8 text, with CRLF line terminators
+src/main/resources/db/migration/V1__init.sql:                                ASCII text, with CRLF line terminators
+src/main/resources/db/migration/V2__dedup_detections.sql:                    Unicode text, UTF-8 text, with CRLF line terminators
+src/main/resources/db/migration/V3__indexes.sql:                             Unicode text, UTF-8 text, with CRLF line terminators
+src/main/resources/db/migration/V4__cameras.sql:                             ASCII text, with CRLF line terminators
+src/main/resources/db/migration/V5__cameras_status.sql:                      ASCII text, with CRLF line terminators
+src/main/resources/logback.xml:                                              XML 1.0 document, Unicode text, UTF-8 text, with CRLF line terminators
+src/main/resources/tessdata/.gitkeep:                                        Unicode text, UTF-8 text, with CRLF line terminators
+src/main/resources/tessdata/eng.traineddata:                                 data
+src/main/resources/tessdata/rus.traineddata:                                 data
+src/test/java/com/quarryvision/core/detection/DetectTest.java:               Unicode text, UTF-8 text, with CRLF line terminators
+src/test/resources/video/test.mp4:                                           ISO Media, MP4 Base Media v1 [ISO 14496-12:2003]
+tools/qv-snapshot-cli/README.md:                                             Unicode text, UTF-8 text, with CRLF line terminators
+tools/qv-snapshot-cli/pom.xml:                                               exported SGML document, Unicode text, UTF-8 text, with CRLF line terminators
+tools/qv-snapshot-cli/src/main/java/com/quarryvision/tools/SnapshotCli.java: Java source, Unicode text, UTF-8 text, with CRLF line terminators
+trello_board.json:                                                           JSON text data

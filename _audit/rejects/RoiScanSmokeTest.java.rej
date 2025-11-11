@@ -1,0 +1,44 @@
+--- test/java/com/quarryvision/core/detection/RoiScanSmokeTest.java	2025-11-04 08:42:10.686784200 +0300
++++ patchs/rsst.patch	2025-11-04 12:28:51.402138500 +0300
+@@ -1,41 +0,0 @@
+-package com.quarryvision.core.detection;
+-
+-import com.quarryvision.core.ocr.OcrService;
+-import org.bytedeco.opencv.opencv_core.Mat;
+-import org.junit.jupiter.api.BeforeAll;
+-import org.junit.jupiter.api.Test;
+-
+-import javax.imageio.ImageIO;
+-import java.awt.image.BufferedImage;
+-import java.lang.reflect.Method;
+-import java.nio.file.Path;
+-
+-import static org.junit.jupiter.api.Assertions.assertNotNull;
+-import static org.junit.jupiter.api.Assertions.assertTrue;
+-
+-public class RoiScanSmokeTest {
+-    static OcrService svc;
+-    static Method tryOcrPlate;
+-
+-    @BeforeAll
+-    static void init() throws Exception {
+-        String dp = System.getProperty("qv.ocr.tessdataDir", "src/main/resources/tessdata");
+-        svc = new OcrService(new OcrService.Config(true, dp, "eng+rus", 7,1));
+-        tryOcrPlate = BucketDetector.class.getDeclaredMethod("tryOcrPlate", OcrService.class, Mat.class);
+-        tryOcrPlate.setAccessible(true);
+-    }
+-
+-    @Test
+-    void plate_not_found_in_some_roi() throws Exception {
+-        // Возьмём одну реальную картинку номера и подадим в ROI-сканер
+-        // Тест превращает BufferedImage -> Mat через PNG-кодек BucketDetector уже делает внутри
+-        Path imPath = Path.of("testdata/ocr/plates/003.png");
+-        BufferedImage img = ImageIO.read(imPath.toFile());
+-        assertNotNull(img, "missing sample image");
+-
+-        // Упростим: позовём публичный readBestToken как smoke,
+-        // а ROI-тест оставим как контракт на отсутствие исключений.
+-        var token = svc.readBestToken(img);
+-        assertTrue(token.isPresent(), "ROI scan smoke: expected some token from sample");
+-    }
+-}

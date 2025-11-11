@@ -1,0 +1,82 @@
+com.quarryvision:quarry-vision:jar:1.2.12-SNAPSHOT
++- org.openjfx:javafx-controls:jar:21.0.3:compile
+|  \- org.openjfx:javafx-controls:jar:win:21.0.3:compile
++- org.openjfx:javafx-fxml:jar:21.0.3:compile
+|  \- org.openjfx:javafx-fxml:jar:win:21.0.3:compile
++- org.openjfx:javafx-graphics:jar:21.0.3:compile
+|  +- org.openjfx:javafx-graphics:jar:win:21.0.3:compile
+|  \- org.openjfx:javafx-base:jar:21.0.3:compile
+|     \- org.openjfx:javafx-base:jar:win:21.0.3:compile
++- org.yaml:snakeyaml:jar:2.2:compile
++- org.bytedeco:opencv-platform:jar:4.9.0-1.5.10:compile
+|  +- org.bytedeco:openblas-platform:jar:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:javacpp-platform:jar:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:android-arm64:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:android-x86_64:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:ios-arm64:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:ios-x86_64:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:linux-arm64:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:linux-ppc64le:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:linux-x86_64:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:macosx-arm64:1.5.10:compile
+|  |  |  +- org.bytedeco:javacpp:jar:macosx-x86_64:1.5.10:compile
+|  |  |  \- org.bytedeco:javacpp:jar:windows-x86_64:1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:android-arm64:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:android-x86_64:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:ios-arm64:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:ios-x86_64:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:linux-x86_64:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:linux-arm64:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:linux-ppc64le:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:macosx-arm64:0.3.26-1.5.10:compile
+|  |  +- org.bytedeco:openblas:jar:macosx-x86_64:0.3.26-1.5.10:compile
+|  |  \- org.bytedeco:openblas:jar:windows-x86_64:0.3.26-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:4.9.0-1.5.10:compile
+|  |  \- org.bytedeco:javacpp:jar:1.5.10:compile
+|  +- org.bytedeco:opencv:jar:android-arm64:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:android-x86_64:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:ios-arm64:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:ios-x86_64:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:linux-x86_64:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:linux-arm64:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:linux-ppc64le:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:macosx-arm64:4.9.0-1.5.10:compile
+|  +- org.bytedeco:opencv:jar:macosx-x86_64:4.9.0-1.5.10:compile
+|  \- org.bytedeco:opencv:jar:windows-x86_64:4.9.0-1.5.10:compile
++- org.junit.jupiter:junit-jupiter:jar:5.10.2:test
+|  +- org.junit.jupiter:junit-jupiter-api:jar:5.10.2:test
+|  |  +- org.opentest4j:opentest4j:jar:1.3.0:test
+|  |  +- org.junit.platform:junit-platform-commons:jar:1.10.2:test
+|  |  \- org.apiguardian:apiguardian-api:jar:1.1.2:test
+|  +- org.junit.jupiter:junit-jupiter-params:jar:5.10.2:test
+|  \- org.junit.jupiter:junit-jupiter-engine:jar:5.10.2:test
+|     \- org.junit.platform:junit-platform-engine:jar:1.10.2:test
++- ch.qos.logback:logback-classic:jar:1.5.6:compile
+|  +- ch.qos.logback:logback-core:jar:1.5.6:compile
+|  \- org.slf4j:slf4j-api:jar:2.0.13:compile
++- org.postgresql:postgresql:jar:42.7.3:compile
+|  \- org.checkerframework:checker-qual:jar:3.42.0:runtime
++- com.zaxxer:HikariCP:jar:5.1.0:compile
++- org.flywaydb:flyway-core:jar:10.17.0:compile
+|  +- com.fasterxml.jackson.dataformat:jackson-dataformat-toml:jar:2.15.2:compile
+|  |  +- com.fasterxml.jackson.core:jackson-databind:jar:2.15.2:compile
+|  |  |  \- com.fasterxml.jackson.core:jackson-annotations:jar:2.15.2:compile
+|  |  \- com.fasterxml.jackson.core:jackson-core:jar:2.15.2:compile
+|  \- com.google.code.gson:gson:jar:2.10.1:compile
++- org.flywaydb:flyway-database-postgresql:jar:10.17.0:compile
+\- net.sourceforge.tess4j:tess4j:jar:5.11.0:compile
+   +- net.java.dev.jna:jna:jar:5.14.0:compile
+   +- com.github.jai-imageio:jai-imageio-core:jar:1.4.0:compile
+   +- org.apache.pdfbox:pdfbox:jar:3.0.1:compile
+   |  +- org.apache.pdfbox:pdfbox-io:jar:3.0.1:compile
+   |  +- org.apache.pdfbox:fontbox:jar:3.0.1:compile
+   |  \- commons-logging:commons-logging:jar:1.2:compile
+   +- org.apache.pdfbox:pdfbox-tools:jar:3.0.1:compile
+   |  +- org.apache.pdfbox:pdfbox-debugger:jar:3.0.1:compile
+   |  \- info.picocli:picocli:jar:4.7.5:compile
+   +- org.apache.pdfbox:jbig2-imageio:jar:3.0.4:compile
+   +- commons-io:commons-io:jar:2.15.1:compile
+   +- net.sourceforge.lept4j:lept4j:jar:1.19.1:compile
+   \- org.jboss:jboss-vfs:jar:3.2.17.Final:compile
+      \- org.jboss.logging:jboss-logging:jar:3.1.4.GA:compile

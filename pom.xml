@@ -17,7 +17,6 @@
         <!-- OCR(optical character recognition) -->
         <tess4j.version>5.11.0</tess4j.version>
     </properties>
-
     <profiles>
         <profile>
             <id>windows</id>
@@ -29,7 +28,6 @@
             </properties>
         </profile>
     </profiles>
-
     <dependencies>
         <!-- JavaFX -->
         <dependency>
@@ -42,11 +40,6 @@
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-graphics</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
 
         <dependency>
             <groupId>org.yaml</groupId>
@@ -54,12 +47,17 @@
             <version>2.2</version>
         </dependency>
         <!-- Позже подключим: OpenCV/FFmpeg, ONNX Runtime, PostgreSQL, Hikari, SLF4J -->
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>opencv-platform</artifactId>
-            <version>4.9.0-1.5.10</version>
-        </dependency>
-
+       <!-- Bytedeco с нативами под все ОС; на GitHub Actions подтянется linux-x86_64 -->
+       <dependency>
+           <groupId>org.bytedeco</groupId>
+           <artifactId>opencv-platform</artifactId>
+           <version>4.9.0-1.5.10</version>
+       </dependency>
+       <dependency>
+           <groupId>org.bytedeco</groupId>
+           <artifactId>openblas-platform</artifactId>
+           <version>0.3.26-1.5.10</version>
+       </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

@@ -38,3 +38,5 @@ ocr:
   # OEM: 1 -- LSTM only, 3 -- default (поиск лучшего)
   oem: 3
 
+  minConf: 70
+
