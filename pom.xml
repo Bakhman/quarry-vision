@@ -27,23 +27,6 @@
                 <javafx.platform>win</javafx.platform>
             </properties>
         </profile>
-
-        <!-- Профиль для кроссплатформенного релиза -->
-        <profile>
-            <id>portable-all</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>opencv-platform</artifactId>
-                    <version>4.9.0-1.5.10</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>openblas-platform</artifactId>
-                    <version>0.3.26-1.5.10</version>
-                </dependency>
-            </dependencies>
-        </profile>
     </profiles>
     <dependencies>
         <!-- JavaFX -->
@@ -64,39 +47,17 @@
             <version>2.2</version>
         </dependency>
         <!-- Позже подключим: OpenCV/FFmpeg, ONNX Runtime, PostgreSQL, Hikari, SLF4J -->
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>opencv</artifactId>
-            <version>4.9.0-1.5.10</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>opencv</artifactId>
-            <version>4.9.0-1.5.10</version>
-            <classifier>windows-x86_64</classifier>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>openblas</artifactId>
-            <version>0.3.26-1.5.10</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>openblas</artifactId>
-            <version>0.3.26-1.5.10</version>
-            <classifier>windows-x86_64</classifier>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>javacpp</artifactId>
-            <version>1.5.10</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>javacpp</artifactId>
-            <version>1.5.10</version>
-            <classifier>windows-x86_64</classifier>
-        </dependency>
+       <!-- Bytedeco с нативами под все ОС; на GitHub Actions подтянется linux-x86_64 -->
+       <dependency>
+           <groupId>org.bytedeco</groupId>
+           <artifactId>opencv-platform</artifactId>
+           <version>4.9.0-1.5.10</version>
+       </dependency>
+       <dependency>
+           <groupId>org.bytedeco</groupId>
+           <artifactId>openblas-platform</artifactId>
+           <version>0.3.26-1.5.10</version>
+       </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
