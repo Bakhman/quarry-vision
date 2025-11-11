@@ -176,7 +176,8 @@ public final class OcrService implements OcrEngine {
             // финальный выбор: самый длинный валидный
             String chosen = candidates.stream()
                     .filter(s -> s.length() >= 3)
-                    .max(Comparator.comparingInt(String::length))
+                    .max(Comparator.<String>comparingInt(OcrService::plateShapeScore)
+                            .thenComparingInt(String::length))
                     .orElse(null);
             return Optional.ofNullable(chosen);
         } catch (Exception e) {
@@ -312,5 +313,17 @@ public final class OcrService implements OcrEngine {
                 bin.setRGB(x, y, (0xFF<<24) | b);
             }
         return bin;
+    }
+
+    /** Приоритет формы: LLDDDDLL или LDDDLL[region]. Больше = лучше. */
+    private static int plateShapeScore(String s) {
+        int score = 0;
+        // generic: LL DDDD LL
+        if (s.matches("^[A-Z]{2}\\d{4}[A-Z]{2}$")) score += 200;
+        // ru score: L DDD LL, регион опционально
+        if (s.matches("^[A-Z]\\d{3}[A-Z]{2}(\\d{2,3})?$")) score += 200;
+        // легкий бонус за идеальную длину 8
+        if (s.length() == 8) score += 10;
+        return score;
     }
 }
