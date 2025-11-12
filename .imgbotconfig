@@ -1,0 +1,6 @@
+{
+  "ignoredFiles": [
+    "testdata/**",
+    "src/test/resources/**"
+  ]
+}
