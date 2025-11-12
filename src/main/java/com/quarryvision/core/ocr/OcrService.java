@@ -13,6 +13,8 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -122,29 +124,124 @@ public final class OcrService implements OcrEngine {
         if (tess == null || bi == null) return Optional.empty();
         try {
             BufferedImage prepared = preparedForOcr(bi);
+            // применяем whitelist и DPI перед распознаванием
+            final String wl = System.getProperty("qv.ocr.whitelist",
+                    "ABEKMHOPCTYXАВЕКМНОРСТУХ0123456789");
+            try { tess.setVariable("tessedit_char_whitelist", wl); } catch (Exception ignore) {}
+            try { tess.setVariable("user_defined_dpi", "300"); } catch (Exception ignore) {}
             String best = bestToken(prepared);
+            java.util.List<String> candidates = new java.util.ArrayList<>();
+            // первичная валидация best по whitelist
+            if (best != null) {
+                String checked = cleanByWhitelist(best, wl);
+                if (checked != null) candidates.add(checked);
+                else best = null; // не прошёл фильтр →  fallback
+            }
             // Fallback: если пусто ИЛИ только цифры, пробуем другой PSM
             if (best == null || best.matches("\\d+")) {
                 int prev = basePsm;
                 try {
-                    // чаще помогает PSM 8 (SINGLE_WORD) или 13 (RAW_LINE). Начнём с 8.
-                    tess.setPageSegMode(8);
-                    String alt = bestToken(prepared);
-                    if (alt != null && !alt.isBlank()) best = alt;
-                    if (best == null || best.matches("\\d+")) {
-                        tess.setPageSegMode(13);
-                        alt = bestToken(prepared);
-                        if (alt != null && !alt.isBlank()) best = alt;
+                    // свип по нескольким PSM
+                    int[] psms = new int[]{8, 7, 6, 13}; // WORD → LINE → BLOCK → RAW_LINE
+                    for (int psm : psms) {
+                        tess.setPageSegMode(psm);
+                        String alt = bestToken(prepared);
+                        if (alt != null && !alt.isBlank()) {
+                            String checked  = cleanByWhitelist(alt, wl);
+                            if (checked != null) { candidates.add(checked); break; }
+                        }
                     }
                 } finally {
                     tess.setPageSegMode(prev);
                 }
             }
-            return Optional.ofNullable(best);
+            // Финальный fallback: общий OCR-текст с фильтрацией по whitelist
+            {
+                String raw = safeDoOcr(prepared);
+                String cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned != null) candidates.add(cleaned);
+                // попытка на инвертированном изображении
+                BufferedImage inv = invertBinary(prepared);
+                raw = safeDoOcr(inv);
+                cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned != null) candidates.add(cleaned);
+            }
+            // doOcr на сером апскейле
+            {
+                BufferedImage gray = upscaledGray(bi);
+                String raw = safeDoOcr(gray);
+                String cleaned = cleanByWhitelist(raw, wl);
+                if (cleaned != null) candidates.add(cleaned);
+            }
+            // финальный выбор: самый длинный валидный
+            String chosen = candidates.stream()
+                    .filter(s -> s.length() >= 3)
+                    .max(Comparator.<String>comparingInt(OcrService::plateShapeScore)
+                            .thenComparingInt(String::length))
+                    .orElse(null);
+            return Optional.ofNullable(chosen);
         } catch (Exception e) {
             log.debug("OCR: best-token failed: {}", e.getMessage());
             return Optional.empty();
         }
+    }
+
+    // ---- вспомогательные ----
+    private String safeDoOcr(BufferedImage img) {
+        try {
+            String t = tess.doOCR(img);
+            return (t == null || t.isBlank()) ? null : t;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String cleanByWhitelist(String raw, String wl) {
+        if (raw == null) return null;
+        String cleaned = raw.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9А-ЯЁ]", "");
+        if (cleaned.length() < 3) return null;
+        boolean hasDigit = cleaned.chars().anyMatch(ch -> ch >= '0' && ch <= '9');
+        boolean hasLetter = cleaned.chars().anyMatch(ch -> (ch >= 'A' && ch <= 'Z') || (ch >= 'А' && ch <= 'Я') || ch=='Ё');
+        if(!hasDigit || ! hasLetter) return null;
+        // если whitelist задан, требуем хотя бы одно совпадение
+        if (wl != null && !wl.isBlank()) {
+            String keepRe = "[" + wl + "]+";
+            if (!cleaned.matches(".*" + keepRe + ".*")) return null;
+        }
+        return cleaned;
+    }
+
+    private static BufferedImage invertBinary(BufferedImage src) {
+        int W = src.getWidth(), H = src.getHeight();
+        BufferedImage dst = new BufferedImage(W, H, BufferedImage.TYPE_BYTE_BINARY);
+        for (int y=0; y<H; y++)
+            for (int x=0; x<W; x++) {
+                int rgb = src.getRGB(x,y);
+                int v = (rgb & 0x00FFFFFF) ==0x00FFFFFF ? 0x000000 : 0xFFFFFF;
+                dst.setRGB(x, y, (0xFF<<24) | v);
+            }
+        return dst;
+    }
+
+    /** Серый апскейл без порога: как в preparedForOcr, но без Отсу. */
+    private BufferedImage upscaledGray(BufferedImage src) {
+        int w = src.getWidth(), h = src.getHeight();
+        BufferedImage gray = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_GRAY);
+        Graphics2D g0 = gray.createGraphics();
+        g0.drawImage(src, 0, 0, null);
+        g0.dispose();
+        int minW = 420;
+        if (w >= minW) return gray;
+        int newW = minW;
+        int newH = Math.max(1, (int)Math.round(h * (newW / (double) w)));
+        BufferedImage scaled = new BufferedImage(newW, newH, BufferedImage.TYPE_BYTE_GRAY);
+        Graphics2D g = scaled.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.drawImage(gray, 0, 0, newW, newH, null);
+        g.dispose();
+        return scaled;
     }
 
     private String bestToken(BufferedImage img) {
@@ -164,7 +261,7 @@ public final class OcrService implements OcrEngine {
         return best;
     }
 
-    /** Подготовка: серый → апскейл до minWidth=420 → контраст-stretch → Отсу. */
+    /** Подготовка: серый → апскейл до minWidth=420 → Отсу. */
     private static BufferedImage preparedForOcr(BufferedImage src) {
         int w = src.getWidth(), h = src.getHeight();
         // to grayscale
@@ -194,7 +291,7 @@ public final class OcrService implements OcrEngine {
             for (int x=0; x<W; x++) {
                 hist[scaled.getRaster().getSample(x, y, 0)]++;
             }
-        int total = W*H, sum=0; for (int t=0;t<256;t++) sum += t*hist[t];
+        int total = W*H, sum=0;
         for (int t=0;t<256;t++) sum += t*hist[t];
         int sumB=0, wB=0;
         double maxVar = -1;
@@ -216,6 +313,17 @@ public final class OcrService implements OcrEngine {
                 bin.setRGB(x, y, (0xFF<<24) | b);
             }
         return bin;
+    }
 
+    /** Приоритет формы: LLDDDDLL или LDDDLL[region]. Больше = лучше. */
+    private static int plateShapeScore(String s) {
+        int score = 0;
+        // generic: LL DDDD LL
+        if (s.matches("^[A-Z]{2}\\d{4}[A-Z]{2}$")) score += 200;
+        // ru score: L DDD LL, регион опционально
+        if (s.matches("^[A-Z]\\d{3}[A-Z]{2}(\\d{2,3})?$")) score += 200;
+        // легкий бонус за идеальную длину 8
+        if (s.length() == 8) score += 10;
+        return score;
     }
 }
