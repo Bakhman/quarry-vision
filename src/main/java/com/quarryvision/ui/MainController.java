@@ -40,9 +40,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.DayOfWeek;
-import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -524,17 +522,17 @@ public class MainController {
                 }
                 pageSize[0] = sz;
                 int offset = page[0] * pageSize[0];
-                List<String> rows = Pg.listRecentDetections(pageSize[0], offset);
+                List<DbDetectionRow> rows = Pg.listDetections(pageSize[0], offset);
                 try {
                     if (rows.isEmpty() && page[0] > 0) {
                         // откат на предыдущую страницу
                         page[0]--;
                         offset = page[0] * pageSize[0];
-                        rows = Pg.listRecentDetections(pageSize[0], page[0] * pageSize[0]);
+                        rows = Pg.listDetections(pageSize[0], page[0] * pageSize[0]);
                     }
                     // offset ТОЛЬКО внутри этой лямбды
                     final int effectiveOffset = offset;
-                    final List<String> pageRows = rows; // <— финализируем для lambda
+                    final List<DbDetectionRow> pageRows = rows; // <— финализируем для lambda
                     final long v = Pg.countVideos();
                     final long d = Pg.countDetections();
                     final long ev = Pg.countEvents();
@@ -543,7 +541,10 @@ public class MainController {
                     final var merges = Pg.listMergeAgg();
 
                     Platform.runLater(() -> {
-                        master.setAll(pageRows);
+                        List<String> formatted = pageRows.stream()
+                                        .map(MainController.this::formatDetectionRow)
+                                        .toList();
+                        master.setAll(formatted);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                         int from = pageRows.isEmpty() ? 0 : effectiveOffset + 1;
                         int to = effectiveOffset + pageRows.size();
@@ -1208,6 +1209,24 @@ public class MainController {
             exec.shutdownNow();
             exec.awaitTermination(2, TimeUnit.SECONDS);
         } catch (Throwable ignore) {}
+    }
+
+    private String formatDetectionRow(DbDetectionRow row) {
+        OffsetDateTime ts = row.createdAt();
+        String when;
+        if (ts == null) {
+            when = "";
+        } else {
+            when = ts.atZoneSameInstant(ZoneOffset.systemDefault())
+                    .toLocalDateTime()
+                    .toString()
+                    .replace('T', ' ');
+        }
+        return "#" + row.id()
+                + " | " + row.eventsCount() + " ev"
+                + " | merge=" + row.mergeMs()
+                + " | " + when
+                + " | " +row.videoPath();
     }
 
     /** Возвращает effective mergeMs: -Dqv.mergeMs приоритетнее YAML. */

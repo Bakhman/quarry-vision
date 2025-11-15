@@ -154,6 +154,48 @@ public final class Pg {
             throw new RuntimeException("listRecentDetections failed", e);
         }
     }
+
+    /** Структурированный список детекций (DTO), удобный для UI/Reports. */
+    public static List<DbDetectionRow> listDetections(int limit) {
+        return listDetections(limit, 0);
+    }
+
+    /** Структурированный список детекций с пагинацией. */
+    public static List<DbDetectionRow> listDetections(int limit, int offset) {
+        final String sql = """
+                SELECT d.id,
+                       d.video_id,
+                       v.path,
+                       d.merge_ms,
+                       d.events_count,
+                       d.created_at
+                FROM detections d
+                JOIN videos v ON v.id = d.video_id
+                ORDER BY d.id DESC
+                LIMIT ? OFFSET ?
+                """;
+        try (Connection c = get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, Math.max(1, limit));
+            ps.setInt(2, Math.max(0, offset));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DbDetectionRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    int id = rs.getInt(1);
+                    int videoId = rs.getInt(2);
+                    String path = rs.getString(3);
+                    int mergeMs = rs.getInt(4);
+                    int eventsCount = rs.getInt(5);
+                    OffsetDateTime createdAt = rs.getObject(6, OffsetDateTime.class);
+                    out.add(new DbDetectionRow(id, videoId, path, mergeMs,eventsCount, createdAt));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("listDetections failed", e);
+        }
+    }
+
     /** Временные метки событий для детекции. */
     public static List<Long> listEventsMs(int detectionId) {
         final String sql = """
