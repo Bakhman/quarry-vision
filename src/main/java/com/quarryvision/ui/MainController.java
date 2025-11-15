@@ -630,12 +630,15 @@ public class MainController {
                         try {
                             Pg.deleteDetection(detId);
                             // после удаления — перезагрузить список и статистику
-                            List<String> rows = Pg.listRecentDetections(50);
+                            List<DbDetectionRow> rows = Pg.listDetections(50);
                             long v = Pg.countVideos();
                             long d = Pg.countDetections();
                             long ev = Pg.countEvents();
                             Platform.runLater(() -> {
-                                master.setAll(rows);
+                                var formatted = rows.stream()
+                                                .map(MainController.this::formatDetectionRow)
+                                                .toList();
+                                master.setAll(formatted);
                                 stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
                                 evArea.clear();
                                 evArea.appendText("Deleted detection #" + detId + "\n");
