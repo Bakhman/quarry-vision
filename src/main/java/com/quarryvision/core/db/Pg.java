@@ -161,7 +161,7 @@ public final class Pg {
     }
 
     /** Структурированный список детекций с пагинацией. */
-    private static List<DbDetectionRow> listDetections(int limit, int offset) {
+    public static List<DbDetectionRow> listDetections(int limit, int offset) {
         final String sql = """
                 SELECT d.id,
                        d.video_id,
