@@ -591,70 +591,60 @@ public class MainController {
 
         showEv.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            if (sel == null || sel.isBlank()) return;
-            // формат строки: "#<id> | ..."
-            int hash = sel.indexOf('#');
-            int sp = sel.indexOf(' ');
-            if (hash != -1 && sp > hash) {
+            Integer detId = parseDetectionId(sel);
+            if (detId == null) {
+                return;
+            }
+            evArea.clear();
+            exec.submit(() -> {
                 try {
-                    // fix: корректный разбор "#<id> ..."
-                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
-                    evArea.clear();
-                    exec.submit(() -> {
-                        try {
-                            List<Long> ts = Pg.listEventsMs(detId);
-                            Platform.runLater(() -> {
-                                evArea.appendText("Detection #" + detId + " events: " + ts.size() + "\n");
-                                for (Long t : ts) {
-                                    evArea.appendText(" @ " + fmtMs(t) + "\n");
-                                }
-                            });
-                        } catch (Exception ex) {
-                            Platform.runLater(() -> evArea.appendText("Load error: " + ex + "\n"));
+                    List<Long> ts = Pg.listEventsMs(detId);
+                    Platform.runLater(() -> {
+                        evArea.appendText("Detection #" + detId + " events: " + ts.size() + "\n");
+                        for (Long t : ts) {
+                            evArea.appendText(" @ " + fmtMs(t) + "\n");
                         }
                     });
-                } catch (NumberFormatException ignore) { /* no-op */}
-            }
+                } catch (Exception ex) {
+                    Platform.runLater(() -> evArea.appendText("Load error: " + ex + "\n"));
+                }
+            });
         });
 
         del.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            if (sel == null || sel.isBlank()) return;
-            int hash = sel.indexOf('#');
-            int sp = sel.indexOf(' ');
-            if (hash != -1 && sp > hash) {
-                try {
-                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
-                    del.setDisable(true);
-                    exec.submit(() -> {
-                        try {
-                            Pg.deleteDetection(detId);
-                            // после удаления — перезагрузить список и статистику
-                            List<DbDetectionRow> rows = Pg.listDetections(50);
-                            long v = Pg.countVideos();
-                            long d = Pg.countDetections();
-                            long ev = Pg.countEvents();
-                            Platform.runLater(() -> {
-                                var formatted = rows.stream()
-                                                .map(MainController.this::formatDetectionRow)
-                                                .toList();
-                                master.setAll(formatted);
-                                stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
-                                evArea.clear();
-                                evArea.appendText("Deleted detection #" + detId + "\n");
-                            });
-                        } catch (Exception ex) {
-                            Platform.runLater(() -> {
-                                evArea.appendText("Delete error: " + ex + "\n");
-                            });
-                        } finally {
-                            Platform.runLater(() -> {
-                                del.setDisable(false);
-                            });
-                        }
-                    });
-                } catch (NumberFormatException ignore) { /* no-op */ }
+            Integer detId = parseDetectionId(sel);
+            if (detId == null) {
+                return;
             }
+            del.setDisable(true);
+            exec.submit(() -> {
+                try {
+                    Pg.deleteDetection(detId);
+                    // после удаления — перезагрузить список и статистику
+                    List<DbDetectionRow> rows = Pg.listDetections(50);
+                    long v = Pg.countVideos();
+                    long d = Pg.countDetections();
+                    long ev = Pg.countEvents();
+                    Platform.runLater(() -> {
+                        var formatted = rows.stream()
+                                        .map(MainController.this::formatDetectionRow)
+                                        .toList();
+                        master.setAll(formatted);
+                        stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
+                        evArea.clear();
+                        evArea.appendText("Deleted detection #" + detId + "\n");
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        evArea.appendText("Delete error: " + ex + "\n");
+                    });
+                } finally {
+                    Platform.runLater(() -> {
+                        del.setDisable(false);
+                    });
+                }
+            });
         });
 
         exportCsv.setOnAction(e -> {
@@ -713,118 +703,109 @@ public class MainController {
 
         openFolder.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            if (sel == null || sel.isBlank()) return;
-            int hash = sel.indexOf('#');
-            int sp = sel.indexOf(' ');
-            if (hash != -1 && sp > hash) {
-                try {
-                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
-                    openFolder.setDisable(true);
-                    exec.submit(() -> {
-                        try {
-                            String p = Pg.findVideoPathByDetection(detId);
-                            if (p == null || p.isBlank()) {
-                                Platform.runLater(() -> evArea.appendText("Path not found for detection #" + detId + "\n"));
-                                return;
-                            }
-                            File f = new File(p);
-                            File dir = f.getParentFile() != null ? f.getParentFile() : f;
-                            String os = System.getProperty("os.name", "").toLowerCase();
-                            boolean handled = false;
-                            // Windows: открыть проводник и подсветить файл если есть
-                            if (os.contains("win")) {
-                                if (f.isFile()) {
-                                    new ProcessBuilder("explorer", "/select,", f.getAbsolutePath()).start();
-                                } else {
-                                    new ProcessBuilder("explorer", dir.getAbsolutePath()).start();
-                                }
-                                handled = true;
-                            }
-                            // macOS: показать в Finder
-                            if (!handled && os.contains("mac")) {
-                                if (f.isFile()) {
-                                    new ProcessBuilder("open", "-R", f.getAbsolutePath()).start();
-                                } else {
-                                    new ProcessBuilder("open", dir.getAbsolutePath()).start();
-                                }
-                                handled = true;
-                            }
-                            // Linux/прочее: Desktop.open папки
-                            if(!handled) {
-                                if (Desktop.isDesktopSupported()) {
-                                    Desktop.getDesktop().open(dir);
-                                    handled = true;
-                                }
-                            }
-                            if (handled) {
-                                Platform.runLater(() -> evArea.appendText("Opened: " + dir.getAbsolutePath() + "\n"));
-                            } else {
-                                Platform.runLater(() -> evArea.appendText("Open folder not supported on this platform\n"));
-                            }
-                        } catch (Exception ex) {
-                            Platform.runLater(() -> evArea.appendText("Open folder error: " + ex + "\n"));
-                        } finally {
-                            Platform.runLater(() -> openFolder.setDisable(false));
-                        }
-                    });
-                } catch (NumberFormatException ignore) {
-                    /* no-op */
-                }
+            Integer detId = parseDetectionId(sel);
+            if (detId == null) {
+                return;
             }
+            openFolder.setDisable(true);
+            exec.submit(() -> {
+                try {
+                    String p = Pg.findVideoPathByDetection(detId);
+                    if (p == null || p.isBlank()) {
+                        Platform.runLater(() -> evArea.appendText("Path not found for detection #" + detId + "\n"));
+                        return;
+                    }
+                    File f = new File(p);
+                    File dir = f.getParentFile() != null ? f.getParentFile() : f;
+                    String os = System.getProperty("os.name", "").toLowerCase();
+                    boolean handled = false;
+                    // Windows: открыть проводник и подсветить файл если есть
+                    if (os.contains("win")) {
+                        if (f.isFile()) {
+                            new ProcessBuilder("explorer", "/select,", f.getAbsolutePath()).start();
+                        } else {
+                            new ProcessBuilder("explorer", dir.getAbsolutePath()).start();
+                        }
+                        handled = true;
+                    }
+                   // macOS: показать в Finder
+                   if (!handled && os.contains("mac")) {
+                       if (f.isFile()) {
+                           new ProcessBuilder("open", "-R", f.getAbsolutePath()).start();
+                       } else {
+                           new ProcessBuilder("open", dir.getAbsolutePath()).start();
+                       }
+                        handled = true;
+                    }
+                    // Linux/прочее: Desktop.open папки
+                    if(!handled) {
+                        if (Desktop.isDesktopSupported()) {
+                            Desktop.getDesktop().open(dir);
+                            handled = true;
+                        }
+                    }
+                    if (handled) {
+                        Platform.runLater(() -> evArea.appendText("Opened: " + dir.getAbsolutePath() + "\n"));
+                    } else {
+                        Platform.runLater(() -> evArea.appendText("Open folder not supported on this platform\n"));
+                    }
+                } catch (Exception ex) {
+                    Platform.runLater(() -> evArea.appendText("Open folder error: " + ex + "\n"));
+                } finally {
+                    Platform.runLater(() -> openFolder.setDisable(false));
+                }
+            });
         });
 
         exportEvents.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            if (sel == null || sel.isBlank()) return;
-            int hash = sel.indexOf('#');
-            int sp = sel.indexOf(' ');
-            if (hash != -1 && sp > hash) {
+            Integer detId = parseDetectionId(sel);
+            if (detId == null) {
+                return;
+            }
+            exportEvents.setDisable(true);
+            exec.submit(() -> {
                 try {
-                    int detId = Integer.parseInt(sel.substring(hash + 1, sp));
-                    exportEvents.setDisable(true);
-                    exec.submit(() -> {
+                    var stamps = Pg.listEventsMs(detId);
+                    String vpath = Pg.findVideoPathByDetection(detId);
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Detection,").append(detId).append("\r\n");
+                    if (vpath != null) sb.append("Video,\"").append(vpath.replace("\"","\"\"")).append("\"\r\n");
+                    sb.append("\r\n#;t_ms;time\n");
+                    for (int i =0; i < stamps.size(); i++) {
+                        long t = stamps.get(i);
+                        sb.append(i + 1).append(';').append(t).append(';').append(fmtMs(t)).append("\r\n");
+                    }
+                    String content = sb.toString();
+                    Platform.runLater(() -> {
                         try {
-                            var stamps = Pg.listEventsMs(detId);
-                            String vpath = Pg.findVideoPathByDetection(detId);
-                            StringBuilder sb = new StringBuilder();
-                            sb.append("Detection,").append(detId).append("\r\n");
-                            if (vpath != null) sb.append("Video,\"").append(vpath.replace("\"","\"\"")).append("\"\r\n");
-                            sb.append("\r\n#;t_ms;time\n");
-                            for (int i =0; i < stamps.size(); i++) {
-                                long t = stamps.get(i);
-                                sb.append(i + 1).append(';').append(t).append(';').append(fmtMs(t)).append("\r\n");
+                            FileChooser fc = new FileChooser();
+                            fc.setTitle("Save Events CSV");
+                            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
+                            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+                            fc.setInitialFileName("qv-events-" + detId + "-" + ts + ".csv");
+                            var win = rep.getScene() != null ? rep.getScene().getWindow() : null;
+                            var f = fc.showSaveDialog(win);
+                            if (f != null) {
+                                Files.writeString(f.toPath(), content, StandardCharsets.UTF_8);
+                                evArea.appendText("Exported events CSV: " + f.getAbsolutePath() + "\n");
+                            } else {
+                                evArea.appendText("Export canceled\n");
                             }
-                            String content = sb.toString();
-                            Platform.runLater(() -> {
-                                try {
-                                    FileChooser fc = new FileChooser();
-                                    fc.setTitle("Save Events CSV");
-                                    fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
-                                    String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-                                    fc.setInitialFileName("qv-events-" + detId + "-" + ts + ".csv");
-                                    var win = rep.getScene() != null ? rep.getScene().getWindow() : null;
-                                    var f = fc.showSaveDialog(win);
-                                    if (f != null) {
-                                        Files.writeString(f.toPath(), content, StandardCharsets.UTF_8);
-                                        evArea.appendText("Exported events CSV: " + f.getAbsolutePath() + "\n");
-                                    } else {
-                                        evArea.appendText("Export canceled\n");
-                                    }
-                                } catch (IOException io) {
-                                    evArea.appendText("Export error: " + io + "\n");
-                                } finally {
-                                    exportEvents.setDisable(false);
-                                }
-                            });
-                        } catch (Exception ex) {
-                            Platform.runLater(() -> {
-                                evArea.appendText("Export error: " + ex + "\n");
-                                exportEvents.setDisable(false);
-                            });
+                        } catch (IOException io) {
+                            evArea.appendText("Export error: " + io + "\n");
+                        } finally {
+                            exportEvents.setDisable(false);
                         }
                     });
-                } catch (NumberFormatException ignore) { /* no-op */}
-            }
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        evArea.appendText("Export error: " + ex + "\n");
+                        exportEvents.setDisable(false);
+                    });
+                }
+            });
+
         });
 
         rep.getChildren().addAll(
@@ -1230,6 +1211,23 @@ public class MainController {
                 + " | merge=" + row.mergeMs()
                 + " | " + when
                 + " | " +row.videoPath();
+    }
+
+    /** Разбор detection-id из строки формата "#<id> | ..." */
+    private Integer parseDetectionId(String sel) {
+        if (sel == null || sel.isBlank()) {
+            return null;
+        }
+        int hash = sel.indexOf('#');
+        int sp = sel.indexOf(' ');
+        if (hash == -1 || sp <= hash + 1) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(sel.substring(hash + 1, sp));
+        } catch (NumberFormatException ignore) {
+            return null;
+        }
     }
 
     /** Возвращает effective mergeMs: -Dqv.mergeMs приоритетнее YAML. */
