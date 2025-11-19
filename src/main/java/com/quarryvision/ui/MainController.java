@@ -542,7 +542,7 @@ public class MainController {
 
                     Platform.runLater(() -> {
                         List<String> formatted = pageRows.stream()
-                                        .map(MainController.this::formatDetectionRow)
+                                        .map(DetectionRowFormat::formatDetectionRow)
                                         .toList();
                         master.setAll(formatted);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
@@ -591,7 +591,7 @@ public class MainController {
 
         showEv.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            Integer detId = parseDetectionId(sel);
+            Integer detId = DetectionRowFormat.parseDetectionId(sel);
             if (detId == null) {
                 return;
             }
@@ -613,7 +613,7 @@ public class MainController {
 
         del.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            Integer detId = parseDetectionId(sel);
+            Integer detId = DetectionRowFormat.parseDetectionId(sel);
             if (detId == null) {
                 return;
             }
@@ -628,7 +628,7 @@ public class MainController {
                     long ev = Pg.countEvents();
                     Platform.runLater(() -> {
                         var formatted = rows.stream()
-                                        .map(MainController.this::formatDetectionRow)
+                                        .map(DetectionRowFormat::formatDetectionRow)
                                         .toList();
                         master.setAll(formatted);
                         stats.setText("Videos: " + v + " | Detections: " + d + " | Events: " + ev);
@@ -703,7 +703,7 @@ public class MainController {
 
         openFolder.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            Integer detId = parseDetectionId(sel);
+            Integer detId = DetectionRowFormat.parseDetectionId(sel);
             if (detId == null) {
                 return;
             }
@@ -759,7 +759,7 @@ public class MainController {
 
         exportEvents.setOnAction(e -> {
             String sel = list.getSelectionModel().getSelectedItem();
-            Integer detId = parseDetectionId(sel);
+            Integer detId = DetectionRowFormat.parseDetectionId(sel);
             if (detId == null) {
                 return;
             }
@@ -1193,41 +1193,6 @@ public class MainController {
             exec.shutdownNow();
             exec.awaitTermination(2, TimeUnit.SECONDS);
         } catch (Throwable ignore) {}
-    }
-
-    private String formatDetectionRow(DbDetectionRow row) {
-        OffsetDateTime ts = row.createdAt();
-        String when;
-        if (ts == null) {
-            when = "";
-        } else {
-            when = ts.atZoneSameInstant(ZoneOffset.systemDefault())
-                    .toLocalDateTime()
-                    .toString()
-                    .replace('T', ' ');
-        }
-        return "#" + row.id()
-                + " | " + row.eventsCount() + " ev"
-                + " | merge=" + row.mergeMs()
-                + " | " + when
-                + " | " +row.videoPath();
-    }
-
-    /** Разбор detection-id из строки формата "#<id> | ..." */
-    private Integer parseDetectionId(String sel) {
-        if (sel == null || sel.isBlank()) {
-            return null;
-        }
-        int hash = sel.indexOf('#');
-        int sp = sel.indexOf(' ');
-        if (hash == -1 || sp <= hash + 1) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(sel.substring(hash + 1, sp));
-        } catch (NumberFormatException ignore) {
-            return null;
-        }
     }
 
     /** Возвращает effective mergeMs: -Dqv.mergeMs приоритетнее YAML. */
