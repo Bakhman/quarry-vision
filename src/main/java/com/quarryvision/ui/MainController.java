@@ -3,6 +3,8 @@ package com.quarryvision.ui;
 import com.quarryvision.app.Config;
 import com.quarryvision.core.db.*;
 import com.quarryvision.core.detection.DetectionResult;
+import com.quarryvision.core.detection.TripSegment;
+import com.quarryvision.core.detection.TripSegmenter;
 import com.quarryvision.core.importer.IngestProcessor;
 import com.quarryvision.core.importer.UsbIngestService;
 import com.quarryvision.core.queue.DetectionQueueService;
@@ -599,10 +601,25 @@ public class MainController {
             exec.submit(() -> {
                 try {
                     List<Long> ts = Pg.listEventsMs(detId);
+                    // время-базированная сегментация рейсов, без номеров (plates = null)
+                    List<TripSegment> trips = TripSegmenter.segment(detId, ts, null);
+
                     Platform.runLater(() -> {
                         evArea.appendText("Detection #" + detId + " events: " + ts.size() + "\n");
                         for (Long t : ts) {
                             evArea.appendText(" @ " + fmtMs(t) + "\n");
+                        }
+
+                        evArea.appendText("\nTime-based trips: " + trips.size() + "\n");
+                        for (int i = 0; i < trips.size(); i++) {
+                            TripSegment trip = trips.get(i);
+                            evArea.appendText(
+                                    " Trip #" + (i + 1)
+                                                + " | events=" + trip.eventsCount()
+                                                + " | " + fmtMs(trip.tStartMs())
+                                                + " .. " +fmtMs(trip.tEndMs())
+                                                + "\n"
+                            );
                         }
                     });
                 } catch (Exception ex) {
