@@ -177,6 +177,7 @@ public final class BucketDetector {
             );
 
             List<Instant> stamps = new ArrayList<>();
+            List<String> ocrPlates = new ArrayList<>();
             long lastEventFrame = -cooldownFrames - 1;
             enum S {IDLE, ACTIVE}
             S st = S.IDLE;
@@ -246,13 +247,14 @@ public final class BucketDetector {
                                 if (durFrames >= minActiveFrames) {
                                     long mid = activeStartFrame + durFrames / 2;
                                     long ms = (long) ((mid / fps) * 1000.0);
-                                    stamps.add(Instant.ofEpochMilli(ms));
+
+                                    String plate = null;
                                     // OCR-хук: один снимок в середине события
                                     if (ocr != null) {
                                         try {
                                             Mat snap = readFrameAt(cap, mid);
                                             if (snap != null && !snap.empty()) {
-                                                String plate = tryOcrPlate(ocr, snap);
+                                                plate = tryOcrPlate(ocr, snap);
                                                 if (plate != null && !plate.isBlank()) {
                                                     log.info("OCR plate@{}ms: {}", ms, plate);
                                                 } else {
@@ -263,6 +265,10 @@ public final class BucketDetector {
                                             log.debug("OCR hook failed: {}", t.toString());
                                         }
                                     }
+
+                                    stamps.add(Instant.ofEpochMilli(ms));
+                                    ocrPlates.add(plate);
+
                                     lastEventFrame = idx;
                                     evtMark = 1;
                                 }
@@ -288,6 +294,7 @@ public final class BucketDetector {
                         long mid = activeStartFrame + durFrames / 2;
                         long ms = (long) ((mid / fps) * 1000.0);
                         stamps.add(Instant.ofEpochMilli(ms));
+                        ocrPlates.add(null); // пока без OCR на хвосте
                         if (log.isInfoEnabled()) {
                             long startMs = (long) ((activeStartFrame / fps) * 1000.0);
                             long durMs = (long) ((durFrames / fps) * 1000.0);
@@ -296,16 +303,22 @@ public final class BucketDetector {
                     }
                 }
                 // простое подавление соседних пиков (NMS окно по времени)
-                List<Instant> nms = new ArrayList<>();
+                List<Instant> nmsTimes = new ArrayList<>();
+                List<String> nmsPlates = new ArrayList<>();
                 Instant winStart = null;
-                for (Instant t : stamps) {
+                for (int i = 0; i < stamps.size(); i++) {
+                    Instant t = stamps.get(i);
+                    String plate = (i < ocrPlates.size()) ? ocrPlates.get(i) : null;
                     if (winStart == null || t.toEpochMilli() - winStart.toEpochMilli() > nmsWindowMs) {
-                        nms.add(t);
+                        nmsTimes.add(t);
+                        nmsPlates.add(plate);
                         winStart = t;
                     }
                 }
-                List<Instant> merged = mergeClose(nms, (long) effectiveMergeMs);
-                return new DetectionResult(videoPath, merged.size(), List.copyOf(merged), fps, frameCount);
+                MergedEvents merged = mergeCloseWithPlates(nmsTimes, nmsPlates, (long) effectiveMergeMs);
+                List<Instant> mergedTimes = List.copyOf(merged.times);
+                List<String> mergedPlates = List.copyOf(merged.plates);
+                return new DetectionResult(videoPath, mergedTimes.size(), mergedTimes, fps, frameCount, mergedPlates);
             } finally {
                 // гарантированное освобождение нативной памяти
                 release(prev, frame, grayPrev, gray, diff, kernel);
@@ -316,6 +329,47 @@ public final class BucketDetector {
                 }
             }
         }
+    }
+
+    private record MergedEvents(List<Instant> times, List<String> plates) {}
+
+    private static MergedEvents mergeCloseWithPlates(List<Instant> srcTimes,
+                                                     List<String> srcPlates,
+                                                     long mergeMs) {
+        if (srcTimes.isEmpty()) {
+            return new MergedEvents(List.of(), List.of());
+        }
+
+        if (srcPlates == null || srcPlates.size() != srcTimes.size()) {
+            throw new IllegalArgumentException("srcPlates size must match srcTimes size");
+        }
+
+        List<Instant> outTimes = new ArrayList<>();
+        List<String> outPlates = new ArrayList<>();
+
+        Instant last = null;
+        for (int i = 0; i < srcTimes.size(); i++) {
+            Instant t = srcTimes.get(i);
+            String p = srcPlates.get(i);
+
+            if (last == null || (t.toEpochMilli() - last.toEpochMilli()) > mergeMs) {
+                // новая группа
+                outTimes.add(t);
+                outPlates.add(p);
+                last = t;
+            } else {
+                // внутри той же группы: если номер ещё пустой, а сейчас есть — обновляем
+                if (p != null && !p.isBlank()) {
+                    int idx = outPlates.size() - 1;
+                    String existing = outPlates.get(idx);
+                    if (existing == null || existing.isBlank()) {
+                        outPlates.set(idx, p);
+                    }
+                }
+            }
+        }
+
+        return new MergedEvents(outTimes, outPlates);
     }
 
     /** Читает кадр по индексу (без изменения текущих Mat), возвращает новый Mat или null. */
