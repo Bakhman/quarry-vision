@@ -1,5 +1,6 @@
 package com.quarryvision.core.detection;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -127,4 +128,43 @@ public final class TripSegmenter {
         return null;
     }
 
+    /**
+     * Упрощённый вызов: сегментация рейсов по DetectionResult
+     * с таймаутом по умолчанию.
+     */
+    public static List<TripSegment> segmentFromDetectionResult(
+            int detectionId,
+            DetectionResult detection
+    ) {
+        return segmentFromDetectionResult(detectionId, detection, DEFAULT_TRIP_TIMEOUT_MS);
+    }
+
+    /**
+     * Сегментация рейсов по DetectionResult:
+     * берём timestampsMs как времена событий и plates/platesOrEmpty как номера.
+     *
+     * @param detectionId   id детекции (БД id, если есть; иначе можно передавать 0/-1)
+     * @param detection     результат детекции ковшей
+     * @param tripTimeoutMs таймаут между событиями одного рейса
+     */
+    private static List<TripSegment> segmentFromDetectionResult(
+            int detectionId,
+            DetectionResult detection,
+            long tripTimeoutMs
+    ) {
+        if (detection == null || detection.timestampsMs() == null || detection.timestampsMs().isEmpty()) {
+            return List.of();
+        }
+
+        // конвертируем Instant → long (ms)
+        List<Long> times = detection.timestampsMs().stream()
+                .map(Instant::toEpochMilli)
+                .toList();
+
+        // берём plates из DetectionResult; если пустой список — считаем, что plates нет
+        List<String> plates = detection.platesOrEmpty();
+        List<String> normalizedPlates = plates.isEmpty() ? null : plates;
+
+        return segment(detectionId, times, normalizedPlates, tripTimeoutMs);
+    }
 }
