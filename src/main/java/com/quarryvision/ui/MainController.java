@@ -39,6 +39,8 @@ import org.opencv.core.Core;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -93,19 +95,62 @@ public class MainController {
             exec.submit(() -> {
                 try {
                     var dc = cfg.detection();
-                    var det = new BucketDetector(dc.stepFrames(), dc.diffThreshold(), dc.eventRatio(),
-                            dc.cooldownFrames(), dc.minChangedPixels(), new Size(dc.morphW(), dc.morphH()), resolveMergeMs(cfg),
-                            dc.emaAlpha(), dc.thrLowFactor(), dc.minActiveMs(), dc.nmsWindowMs(), dc.trace());
+                    var det = new BucketDetector(
+                            dc.stepFrames(),
+                            dc.diffThreshold(),
+                            dc.eventRatio(),
+                            dc.cooldownFrames(),
+                            dc.minChangedPixels(),
+                            new Size(dc.morphW(), dc.morphH()),
+                            resolveMergeMs(cfg),
+                            dc.emaAlpha(),
+                            dc.thrLowFactor(),
+                            dc.minActiveMs(),
+                            dc.nmsWindowMs(),
+                            dc.trace());
                     var res = det.detect(p);
                     int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
                     int detId = Pg.insertDetection(videoId, det.effectiveMergeMs(), res.timestampsMs());
+
+                    // аккуратно считаем trips, чтобы ошибка сегментации не ломала Detect
+                    List<TripSegment> trips;
+
+                    try {
+                        trips = TripSegmenter.segmentFromDetectionResult(detId, res);
+                    } catch (Exception tripEx) {
+                        trips = List.of();
+                        String msg = "Trip segmentation error (detect): " + tripEx;
+                        Platform.runLater(() -> log.appendText(msg + '\n'));
+                    }
+
+                    final List<TripSegment> tripsFinal = trips;
                     Platform.runLater(() -> {
                         log.appendText(String.format("Detect: %s ...%n", src));
+                        // используем res.events(), а не прямой доступ к timestampsMs
                         log.appendText(String.format("Saved detection id=%d videoId=%d events=%d%n",
-                                detId, videoId, res.timestampsMs().size()));
+                                detId, videoId, res.events()));
+                        log.appendText(String.format("Trips: %d%n", tripsFinal.size()));
+                        for (int i = 0; i < tripsFinal.size(); i++) {
+                            TripSegment t = tripsFinal.get(i);
+                            String plate = t.plate();
+                            if (plate == null || plate.isBlank()) {
+                                plate = "undefined";
+                            }
+                            log.appendText(String.format(
+                                    " Trip #%d | events=%d | plate=%s | %s .. %s%n",
+                                    i + 1,
+                                    t.eventsCount(),
+                                    plate,
+                                    fmtMs(t.tStartMs()),
+                                    fmtMs(t.tEndMs())
+                            ));
+                        }
                     });
                 } catch (Exception ex2) {
-                    Platform.runLater(() -> log.appendText("Detect error: " + ex2 + "\n"));
+                    StringWriter sw  = new StringWriter();
+                    ex2.printStackTrace(new PrintWriter(sw));
+                    String stack = sw.toString();
+                    Platform.runLater(() -> log.appendText("Detect error!!!: " + ex2 + "\n" + stack + "\n"));
                 } finally {
                     Platform.runLater(() -> detectBtn.setDisable(false));
                 }
@@ -262,7 +307,10 @@ public class MainController {
                         }
                     });
                 } catch (Exception ex) {
-                    Platform.runLater(() -> log.appendText("Detect error: " + ex + "\n"));
+                    StringWriter sw = new StringWriter();
+                    ex.printStackTrace(new PrintWriter(sw));
+                    String stack = sw.toString();
+                    Platform.runLater(() -> log.appendText("Detect error: " + ex + "\n" + stack + "\n"));
                 } finally {
                     Platform.runLater(() -> detect.setDisable(false));
                 }
@@ -378,14 +426,42 @@ public class MainController {
                 int detId = Pg.insertDetection(videoId, mergeMs, dr.timestampsMs());
                 onProgress.accept(100);
 
+                // считаем рейсы по DetectionResult с защитой
+                List<TripSegment> trips;
+                try {
+                    trips = TripSegmenter.segmentFromDetectionResult(detId, dr);
+                } catch (Exception tripEx) {
+                    trips = List.of();
+                    String msg = "Trip segmentation error (queue): " + tripEx;
+                    Platform.runLater(() -> qLog.appendText(msg + "\n"));
+                }
+
+                // готовим текст лога
+                StringBuilder sb = new StringBuilder();
+                sb.append("Saved detection #").append(detId)
+                        .append(" videoId=").append(videoId)
+                        .append(" events=").append(dr.events())
+                        .append(" fps=").append(dr.fps())
+                        .append(" frames=").append(dr.frames())
+                        .append('\n');
+                sb.append("Trips: ").append(trips.size()).append('\n');
+                for (int i = 0; i <trips.size(); i++) {
+                    TripSegment t = trips.get(i);
+                    String plate = t.plate();
+                    if (plate == null || plate.isBlank()) {
+                        plate = "undefined";
+                    }
+                    sb.append(" Trip #").append(i + 1)
+                            .append(" | events=").append(t.eventsCount())
+                            .append(" | plate=").append(plate)
+                            .append(" | ").append(fmtMs(t.tStartMs()))
+                            .append(" .. ").append(fmtMs(t.tEndMs()))
+                            .append('\n');
+                }
+
                 // 6) Обновляем лог и Reports
                 Platform.runLater(() -> {
-                    qLog.appendText(
-                            "Saved detection #" + detId +
-                                    " videoId=" + videoId +
-                                    " events=" + dr.events() +
-                                    " fps=" + dr.fps() +
-                                    " frames=" +dr.frames() + "\n");
+                    qLog.appendText(sb.toString());
                     if (reportsReload != null) reportsReload.run();
                 });
             });

@@ -316,8 +316,10 @@ public final class BucketDetector {
                     }
                 }
                 MergedEvents merged = mergeCloseWithPlates(nmsTimes, nmsPlates, (long) effectiveMergeMs);
+                // times можно копировать через List.copyOf (там нет null)
                 List<Instant> mergedTimes = List.copyOf(merged.times);
-                List<String> mergedPlates = List.copyOf(merged.plates);
+                // а в plates могут быть null → делаем обычную копию
+                List<String> mergedPlates = new ArrayList<>(merged.plates);
                 return new DetectionResult(videoPath, mergedTimes.size(), mergedTimes, fps, frameCount, mergedPlates);
             } finally {
                 // гарантированное освобождение нативной памяти
