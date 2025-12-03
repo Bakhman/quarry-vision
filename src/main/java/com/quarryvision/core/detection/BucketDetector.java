@@ -31,6 +31,15 @@ import java.util.List;
  */
 public final class BucketDetector {
     private static final Logger log = LoggerFactory.getLogger(BucketDetector.class);
+    private static final boolean OCR_FAST_MODE =
+            "fast".equalsIgnoreCase(System.getProperty("qv.ocr.mode", "fast"));
+
+    /**
+     * Максимальное число вызовов OCR (readBestToken) на один detect(video).
+     * В FAST-режиме сильно режем, в AUDIT – можно побольше.
+     */
+    private static final int MAX_OCR_CALLS_PER_DETECT =
+            Integer.getInteger("qv.ocr.maxCallsPerDetect", OCR_FAST_MODE ? 150 : 1000);
 
     private final int stepFrames;       // шаг по кадрам, например 3..5
     private final int diffThreshold;    // порог бинаризации 15..40
@@ -118,6 +127,8 @@ public final class BucketDetector {
     }
 
     public DetectionResult detect(Path videoPath) {
+        // лимитируем количество вызовов OCR на один прогон detect(video)
+        this.ocrCallsThisDetect = 0;
         final boolean ocrEnabled = Boolean.getBoolean("qv.ocr.init");
         final OcrService ocr = ocrEnabled ? new OcrService(
                 new OcrService.Config(
@@ -388,7 +399,7 @@ public final class BucketDetector {
     }
 
     /** Сканирует несколько ROI в нижней полосе и выбирает лучший результат OCR. */
-    private static String tryOcrPlate(OcrService ocr, Mat bgr) {
+    private String tryOcrPlate(OcrService ocr, Mat bgr) {
         int h = bgr.rows(), w = bgr.cols();
         // сетка по X и размерам: центр и соседние позиции
         double[] fxList = {0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65};
@@ -399,33 +410,53 @@ public final class BucketDetector {
         String best = null;
         int bestScore = -1;
         int roiIdx = 0;
-        for (double fy : fyList) for (double fh : fhList)
-            for (double fx : fxList) for (double fw : fwList) {
-                int rx = clamp((int)Math.round(w*fx), 0, w-1);
-                int ry = clamp((int)Math.round(h*fy), 0, h-1);
-                int rw = clamp((int)Math.round(w*fw), 1, w-rx);
-                int rh = clamp((int)Math.round(h*fh), 1, h-ry);
-                Rect r = new Rect(rx, ry, rw, rh);
-                String got = ocrOnceOnRoi(ocr, bgr, r, "roi_"+(roiIdx++));
-                if (got == null) continue;
+        // В fast-режиме ограничиваем кол-во ROI, чтобы не дергать OCR сотни раз
+        final int maxRoiPerScan = OCR_FAST_MODE ? 80 : Integer.MAX_VALUE;
 
-                String cleaned = got.toUpperCase().replaceAll("[^A-Z0-9]","");
-                String norm = normalizePlate(cleaned);
-                int score = (norm != null ? 100 : cleaned.length()); // валидный шаблон — максимум
-                String candidate = (norm != null ? norm : cleaned);
-                if (log.isDebugEnabled()) {
-                    log.debug("OCR roi#{} rect=({}, {}, {}, {}): raw='{}' cleaned='{}' norm='{}' score='{}'",
-                            roiIdx - 1, rx, ry, rw, rh, got, cleaned, norm, score);
-                }
-                if (score > bestScore) { bestScore = score; best = candidate; }
-                if (bestScore >= 100) return best; // нашли валидный LLDDDDLL
-            }
+        outer:
+        for (double fy : fyList)
+            for (double fh : fhList)
+                for (double fx : fxList)
+                    for (double fw : fwList) {
+                        if (OCR_FAST_MODE && roiIdx >= maxRoiPerScan) {
+                            if (log.isDebugEnabled()) {
+                                log.debug("OCR: reached maxRoiPerScan={} (roiIdx={}), stop scanning plate ROI",
+                                        maxRoiPerScan, roiIdx);
+                            }
+                            break outer;
+                        }
+
+                        int rx = clamp((int) Math.round(w * fx), 0, w - 1);
+                        int ry = clamp((int) Math.round(h * fy), 0, h - 1);
+                        int rw = clamp((int) Math.round(w * fw), 1, w - rx);
+                        int rh = clamp((int) Math.round(h * fh), 1, h - ry);
+                        Rect r = new Rect(rx, ry, rw, rh);
+                        String got = ocrOnceOnRoi(ocr, bgr, r, "roi_" + (roiIdx++));
+                        if (got == null) continue;
+
+                        String cleaned = got.toUpperCase().replaceAll("[^A-Z0-9]", "");
+                        String norm = normalizePlate(cleaned);
+                        int score = (norm != null ? 100 : cleaned.length()); // валидный шаблон — максимум
+                        String candidate = (norm != null ? norm : cleaned);
+                        if (log.isDebugEnabled()) {
+                            log.debug("OCR roi#{} rect=({}, {}, {}, {}): raw='{}' cleaned='{}' norm='{}' score='{}'",
+                                    roiIdx - 1, rx, ry, rw, rh, got, cleaned, norm, score);
+                        }
+                        if (score > bestScore) {
+                            bestScore = score;
+                            best = candidate;
+                        }
+                        if (bestScore >= 100) return best; // нашли валидный LLDDDDLL
+                    }
 
         if (log.isDebugEnabled()) log.debug("OCR best='{}' score={}", best, bestScore);
         return best;
     }
 
-    private static String ocrOnceOnRoi(OcrService ocr, Mat bgr, Rect r, String tag) {
+    private int ocrCallsThisDetect = 0;
+
+    private String ocrOnceOnRoi(OcrService ocr, Mat bgr, Rect r, String tag) {
+        if (this.ocrCallsThisDetect >= MAX_OCR_CALLS_PER_DETECT) return null;
         Mat roi = new Mat(bgr, r).clone();
         Mat gray = new Mat(); opencv_imgproc.cvtColor(roi, gray, opencv_imgproc.COLOR_BGR2GRAY);
         var clahe = opencv_imgproc.createCLAHE(2.0, new Size(8,8));
@@ -455,6 +486,11 @@ public final class BucketDetector {
         double fillMin     = Double.parseDouble(System.getProperty("qv.ocr.fillMin", "0.01"));
         double fillMax     = Double.parseDouble(System.getProperty("qv.ocr.fillMax", "0.90"));
         boolean needFallback = (fill < fillMin || fill > fillMax || contrast < minContrast);
+        if (needFallback && OCR_FAST_MODE) {
+            // в fast-режиме не тратим время на дополнительные бинаризации —
+            // сразу пробуем OCR по первичному bin
+            needFallback = false;
+        }
         if (needFallback) {
             // альтернативная адаптивная бинаризация с более крупным окном
             int b2 = Integer.getInteger("qv.ocr.adaptBlock2", 41);
@@ -514,21 +550,25 @@ public final class BucketDetector {
         try {
             BufferedImage bi = ImageIO.read(new ByteArrayInputStream(bytes));
             // сначала пробуем самый уверенный токен, потом общий текст
+            this.ocrCallsThisDetect++;
             String raw = ocr.readBestToken(bi).orElse(null);
             if (raw == null) {
-                // Fallback: инверсия бинарного изображения и повторная попытка
-                Mat binInv = new Mat();
-                opencv_core.bitwise_not(bin, binInv);
-                BytePointer buf2 = new BytePointer();
-                boolean ok2 = opencv_imgcodecs.imencode(".png", binInv, buf2);
-                if (ok2) {
-                    byte[] b2 = new byte[(int)buf2.limit()];
-                    buf2.get(b2);
-                    BufferedImage bi2 = ImageIO.read(new ByteArrayInputStream(b2));
-                    raw = ocr.readBestToken(bi2).orElse(null);
+                if (!OCR_FAST_MODE) {
+                    // Fallback: инверсия бинарного изображения и повторная попытка
+                    Mat binInv = new Mat();
+                    opencv_core.bitwise_not(bin, binInv);
+                    BytePointer buf2 = new BytePointer();
+                    boolean ok2 = opencv_imgcodecs.imencode(".png", binInv, buf2);
+                    if (ok2) {
+                        byte[] b2 = new byte[(int) buf2.limit()];
+                        buf2.get(b2);
+                        BufferedImage bi2 = ImageIO.read(new ByteArrayInputStream(b2));
+                        this.ocrCallsThisDetect++;
+                        raw = ocr.readBestToken(bi2).orElse(null);
+                    }
+                    buf2.deallocate();
+                    binInv.release();
                 }
-                buf2.deallocate();
-                binInv.release();
                 if (raw == null) return null;
             }
             return raw.trim();
