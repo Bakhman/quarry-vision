@@ -25,9 +25,14 @@ import java.util.Optional;
  */
 public final class OcrService implements OcrEngine {
     private static final Logger log = LoggerFactory.getLogger(OcrService.class);
+
+    private enum Mode { FAST, AUDIT }
+
+
     private final Tesseract tess;
     private final int basePsm;
     private final int baseOem;
+    private final Mode mode;
 
     public static final class Config {
         public final boolean enabled;
@@ -50,6 +55,7 @@ public final class OcrService implements OcrEngine {
             this.tess = null;
             this.basePsm = 0;
             this.baseOem = 0;
+            this.mode = Mode.FAST;
             log.info("OCR: disabled in config");
             return;
         }
@@ -71,6 +77,9 @@ public final class OcrService implements OcrEngine {
                 // латиница + кириллица-двойники + цифры
                 "ABEKMHOPCTYXАВЕКМНОРСТУХ0123456789" );
 
+        String modeProp = System.getProperty("qv.ocr.mode", "fast");
+        Mode mode = "audit".equalsIgnoreCase(modeProp) ? Mode.AUDIT : Mode.FAST;
+
         Tesseract t = new Tesseract();
         t.setDatapath(dp.toString());
         t.setLanguage(languages);
@@ -86,10 +95,11 @@ public final class OcrService implements OcrEngine {
         t.setVariable("preserve_interword_spaces", "1");
 
         this.tess = t;
-        this.basePsm = cfg.psm;
-        this.baseOem = cfg.oem;
-        log.info("OCR: init datapath={} languages={} psm={} oem={}",
-                dp, languages, psm, oem);
+        this.basePsm = psm;
+        this.baseOem = oem;
+        this.mode = mode;
+        log.info("OCR: init datapath={} languages={} psm={} oem={} mode={}",
+                dp, languages, psm, oem, mode);
     }
 
     /** Простой OCR всего изображения. Возвращает trimmed-текст без внутренних переводов строк */
@@ -142,7 +152,10 @@ public final class OcrService implements OcrEngine {
                 int prev = basePsm;
                 try {
                     // свип по нескольким PSM
-                    int[] psms = new int[]{8, 7, 6, 13}; // WORD → LINE → BLOCK → RAW_LINE
+                    int[] psms = (mode == Mode.AUDIT)
+                            ? new int[]{8, 7, 6, 13} // WORD → LINE → BLOCK → RAW_LINE
+                            : new int[]{8, 7};       // урезанный FAST-режим
+
                     for (int psm : psms) {
                         tess.setPageSegMode(psm);
                         String alt = bestToken(prepared);
@@ -156,7 +169,8 @@ public final class OcrService implements OcrEngine {
                 }
             }
             // Финальный fallback: общий OCR-текст с фильтрацией по whitelist
-            {
+            // В FAST-режиме отключаем тяжёлые doOCR-варианты и работаем только через getWords/PSM.
+            if (mode == Mode.AUDIT) {
                 String raw = safeDoOcr(prepared);
                 String cleaned = cleanByWhitelist(raw, wl);
                 if (cleaned != null) candidates.add(cleaned);
@@ -165,12 +179,11 @@ public final class OcrService implements OcrEngine {
                 raw = safeDoOcr(inv);
                 cleaned = cleanByWhitelist(raw, wl);
                 if (cleaned != null) candidates.add(cleaned);
-            }
-            // doOcr на сером апскейле
-            {
+
+                // doOcr на сером апскейле
                 BufferedImage gray = upscaledGray(bi);
-                String raw = safeDoOcr(gray);
-                String cleaned = cleanByWhitelist(raw, wl);
+                raw = safeDoOcr(gray);
+                cleaned = cleanByWhitelist(raw, wl);
                 if (cleaned != null) candidates.add(cleaned);
             }
             // финальный выбор: самый длинный валидный
