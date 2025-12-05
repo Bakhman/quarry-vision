@@ -10,7 +10,7 @@
 1. Обнови `main`:
    ```sh
    git checkout main && git pull
-
+   ```
 
 2. Создай новую ветку:
 
