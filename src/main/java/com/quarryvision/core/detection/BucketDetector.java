@@ -400,6 +400,12 @@ public final class BucketDetector {
 
     /** Сканирует несколько ROI в нижней полосе и выбирает лучший результат OCR. */
     private String tryOcrPlate(OcrService ocr, Mat bgr) {
+
+        if (log.isDebugEnabled()) {
+            log.debug("OCR: start tryOcrPlate, OCR_FAST_MODE={}, MAX_OCR_CALLS_PER_DETECT={}",
+                    OCR_FAST_MODE, MAX_OCR_CALLS_PER_DETECT);
+        }
+
         int h = bgr.rows(), w = bgr.cols();
         // сетка по X и размерам: центр и соседние позиции
         double[] fxList = {0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65};
@@ -410,6 +416,12 @@ public final class BucketDetector {
         String best = null;
         int bestScore = -1;
         int roiIdx = 0;
+        if (log.isDebugEnabled()) {
+            log.debug("OCR: scanning plate ROI, maxRoiPerScan={}, grid sizes: fx={}, fw={}, fy={}, fh={}",
+                    (OCR_FAST_MODE ? 80 : Integer.MAX_VALUE),
+                    fxList.length, fwList.length, fyList.length, fhList.length);
+        }
+
         // В fast-режиме ограничиваем кол-во ROI, чтобы не дергать OCR сотни раз
         final int maxRoiPerScan = OCR_FAST_MODE ? 80 : Integer.MAX_VALUE;
 
@@ -420,8 +432,8 @@ public final class BucketDetector {
                     for (double fw : fwList) {
                         if (OCR_FAST_MODE && roiIdx >= maxRoiPerScan) {
                             if (log.isDebugEnabled()) {
-                                log.debug("OCR: reached maxRoiPerScan={} (roiIdx={}), stop scanning plate ROI",
-                                        maxRoiPerScan, roiIdx);
+                                log.debug("OCR: reached maxRoiPerScan={} (roiIdx={}), stop scanning plate ROI, best='{}', bestScore={}",
+                                        maxRoiPerScan, roiIdx, best, bestScore);
                             }
                             break outer;
                         }
@@ -445,6 +457,9 @@ public final class BucketDetector {
                         if (score > bestScore) {
                             bestScore = score;
                             best = candidate;
+                            if (log.isDebugEnabled()) {
+                                log.debug("OCR: new best='{}' score={} at roi#{}", best, bestScore, roiIdx - 1);
+                            }
                         }
                         if (bestScore >= 100) return best; // нашли валидный LLDDDDLL
                     }
@@ -456,7 +471,13 @@ public final class BucketDetector {
     private int ocrCallsThisDetect = 0;
 
     private String ocrOnceOnRoi(OcrService ocr, Mat bgr, Rect r, String tag) {
-        if (this.ocrCallsThisDetect >= MAX_OCR_CALLS_PER_DETECT) return null;
+        if (this.ocrCallsThisDetect >= MAX_OCR_CALLS_PER_DETECT) {
+            if (log.isDebugEnabled()) {
+                log.debug("OCR: skip ROI {} because MAX_OCR_CALLS_PER_DETECT={} reached (rect({}, {}, {}, {}))",
+                        tag, MAX_OCR_CALLS_PER_DETECT, r.x(), r.y(), r.width(), r.height());
+            }
+            return null;
+        }
         Mat roi = new Mat(bgr, r).clone();
         Mat gray = new Mat(); opencv_imgproc.cvtColor(roi, gray, opencv_imgproc.COLOR_BGR2GRAY);
         var clahe = opencv_imgproc.createCLAHE(2.0, new Size(8,8));
