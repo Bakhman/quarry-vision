@@ -506,11 +506,15 @@ public final class BucketDetector {
         double minContrast = Double.parseDouble(System.getProperty("qv.ocr.minContrast", "0.10"));
         double fillMin     = Double.parseDouble(System.getProperty("qv.ocr.fillMin", "0.01"));
         double fillMax     = Double.parseDouble(System.getProperty("qv.ocr.fillMax", "0.90"));
-        boolean needFallback = (fill < fillMin || fill > fillMax || contrast < minContrast);
+        boolean lowContrast = contrast < minContrast;
+        boolean badFill = (fill < fillMin || fill > fillMax);
+        boolean needFallback = badFill || lowContrast;
         if (needFallback && OCR_FAST_MODE) {
             // FAST-режим: ROI явно "плохой" по заполнению/контрасту — даже не зовём OCR
             if (log.isDebugEnabled()) {
-                log.debug("OCR fast: skip ROI after primary bin (fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect=({}, {}, {}, {})",
+                log.debug("OCR fast: drop ROI after primary bin (badFill={}, lowContrast={}, " +
+                        "fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {})",
+                        badFill, lowContrast,
                         String.format("%.3f", fill),
                         String.format("%.3f", contrast),
                         String.format("%.3f", minContrast),
@@ -561,8 +565,12 @@ public final class BucketDetector {
 
         }
         if (needFallback) {
+            boolean badFillFinal = (fill < fillMin || fill > fillMax);
+            boolean lowContrastFinal =  contrast < minContrast;
             if (log.isDebugEnabled()) {
-                log.debug("OCR skip after fallbacks (fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {}",
+                log.debug("OCR drop ROI after fallbacks (badFill={}, lowContrast={}, "
+                            + "fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {})",
+                        badFillFinal, lowContrastFinal,
                         String.format("%.3f", fill),
                         String.format("%.3f", contrast),
                         String.format("%.3f", minContrast),
@@ -581,6 +589,11 @@ public final class BucketDetector {
             BufferedImage bi = ImageIO.read(new ByteArrayInputStream(bytes));
             // сначала пробуем самый уверенный токен, потом общий текст
             this.ocrCallsThisDetect++;
+            if (log.isDebugEnabled()) {
+                log.debug("OCR call #{} for ROI {} (rect=({}, {}, {}, {}))",
+                        this.ocrCallsThisDetect,
+                        tag, r.x(), r.y(), r.width(), r.height());
+            }
             String raw = ocr.readBestToken(bi).orElse(null);
             if (raw == null) {
                 if (!OCR_FAST_MODE) {
@@ -590,6 +603,11 @@ public final class BucketDetector {
                     BytePointer buf2 = new BytePointer();
                     boolean ok2 = opencv_imgcodecs.imencode(".png", binInv, buf2);
                     if (ok2) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("OCR fallback invert: call #{} for ROI {} (rect=({}, {}, {}, {}))",
+                                    this.ocrCallsThisDetect + 1,
+                                    tag, r.x(), r.y(), r.width(), r.height());
+                        }
                         byte[] b2 = new byte[(int) buf2.limit()];
                         buf2.get(b2);
                         BufferedImage bi2 = ImageIO.read(new ByteArrayInputStream(b2));
