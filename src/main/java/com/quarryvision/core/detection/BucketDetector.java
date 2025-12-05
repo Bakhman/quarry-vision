@@ -508,9 +508,18 @@ public final class BucketDetector {
         double fillMax     = Double.parseDouble(System.getProperty("qv.ocr.fillMax", "0.90"));
         boolean needFallback = (fill < fillMin || fill > fillMax || contrast < minContrast);
         if (needFallback && OCR_FAST_MODE) {
-            // в fast-режиме не тратим время на дополнительные бинаризации —
-            // сразу пробуем OCR по первичному bin
-            needFallback = false;
+            // FAST-режим: ROI явно "плохой" по заполнению/контрасту — даже не зовём OCR
+            if (log.isDebugEnabled()) {
+                log.debug("OCR fast: skip ROI after primary bin (fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect=({}, {}, {}, {})",
+                        String.format("%.3f", fill),
+                        String.format("%.3f", contrast),
+                        String.format("%.3f", minContrast),
+                        String.format("%.3f", fillMin),
+                        String.format("%.3f", fillMax),
+                        r.x(), r.y(), r.width(), r.height());
+            }
+            release(k, bin, up, den, eq, gray, roi);
+            return null;
         }
         if (needFallback) {
             // альтернативная адаптивная бинаризация с более крупным окном
