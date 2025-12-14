@@ -445,8 +445,8 @@ public final class BucketDetector {
                         Rect r = new Rect(rx, ry, rw, rh);
                         String got = ocrOnceOnRoi(ocr, bgr, r, "roi_" + (roiIdx++));
                         if (got == null) continue;
-
-                        String cleaned = got.toUpperCase().replaceAll("[^A-Z0-9]", "");
+                        // Не выбрасываем кириллицу — оставляем A-Z, 0-9 и А-ЯЁ, как в OcrService
+                        String cleaned = got.toUpperCase().replaceAll("[^A-Z0-9А-ЯЁ]", "");
                         String norm = normalizePlate(cleaned);
                         int score = (norm != null ? 100 : cleaned.length()); // валидный шаблон — максимум
                         String candidate = (norm != null ? norm : cleaned);
@@ -463,8 +463,13 @@ public final class BucketDetector {
                         }
                         if (bestScore >= 100) return best; // нашли валидный LLDDDDLL
                     }
-
-        if (log.isDebugEnabled()) log.debug("OCR best='{}' score={}", best, bestScore);
+        // Отсекаем слишком короткие «номера» (например, "2") — считаем, что номер не найден
+        if (best != null && best.length() < 4) {
+            if (log.isDebugEnabled()) {
+                log.debug("OCR best='{}' score={}", best, bestScore);
+            }
+        }
+        if (log.isDebugEnabled()) log.debug("OCR best='{}' score={} too short, drop as plate", best, bestScore);
         return best;
     }
 
