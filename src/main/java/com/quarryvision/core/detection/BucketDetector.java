@@ -127,7 +127,7 @@ public final class BucketDetector {
     }
 
     public DetectionResult detect(Path videoPath) {
-        // лимитируем количество вызовов OCR на один прогон detect(video)
+        // Счётчик используется как лимит на одну попытку распознавания номера (plate scan).
         this.ocrCallsThisDetect = 0;
         final boolean ocrEnabled = Boolean.getBoolean("qv.ocr.init");
         final OcrService ocr = ocrEnabled ? new OcrService(
@@ -265,6 +265,7 @@ public final class BucketDetector {
                                         try {
                                             Mat snap = readFrameAt(cap, mid);
                                             if (snap != null && !snap.empty()) {
+                                                this.ocrCallsThisDetect = 0; // reset budget per plate scan (каждое событие)
                                                 plate = tryOcrPlate(ocr, snap);
                                                 if (plate != null && !plate.isBlank()) {
                                                     log.info("OCR plate@{}ms: {}", ms, plate);
