@@ -463,14 +463,12 @@ public final class BucketDetector {
                         }
                         if (bestScore >= 100) return best; // нашли валидный LLDDDDLL
                     }
-        // Отсекаем слишком короткие «номера» (например, "2") — считаем, что номер не найден
-        if (best != null && best.length() < 4) {
-            if (log.isDebugEnabled()) {
-                log.debug("OCR best='{}' score={}", best, bestScore);
-            }
+        if (log.isDebugEnabled()) {
+            log.debug("OCR best='{}' score={}", best, bestScore);
         }
-        if (log.isDebugEnabled()) log.debug("OCR best='{}' score={} too short, drop as plate", best, bestScore);
-        return best;
+        // Для бизнес-логики принимаем только нормализованный номер (score=100),
+        // иначе считаем, что номер не найден.
+        return (bestScore >= 100) ? best : null;
     }
 
     private int ocrCallsThisDetect = 0;
