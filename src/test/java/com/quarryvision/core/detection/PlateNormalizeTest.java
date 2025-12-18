@@ -33,4 +33,6 @@ class PlateNormalizeTest {
     @Test void garbage_returns_null() { assertNull(norm("###***")); }
     @Test void ru_plate_basic()  { assertEquals("O793PP",     norm("о793рр")); }
     @Test void ru_with_region()  { assertEquals("O793PP",  norm("О793РР123")); }
+    @Test void generic_short_ok() {assertEquals("BE8624", norm("BE 8624"));} // пробелы/разделители допускаются
+    @Test void ru_plate_cant_start_with_A() {assertEquals("A123BC", norm("A123BC"));} // проверка isRuLatLetter
 }

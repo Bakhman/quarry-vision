@@ -643,26 +643,33 @@ public final class BucketDetector {
         if (s == null || s.isEmpty()) return null;
         // 0) базовая нормализация регистра + кириллицы
         String base = translitRuPlateLettersToLatin(s.toUpperCase());
+        // Убираем разделители/мусор, но сохраняем буквы/цифры (включая кириллицу),
+        // чтобы корректно обрабатывать варианты типа "ВЕ 8624" или "О793РР 123".
+        String compact = base.replaceAll("[^\\p{L}\\p{N}]", "");
 
         // 1) две гипотезы путаниц:
         //    a) буквенная: цифры, похожие на буквы → буквы (0→O,1→I,5→S,2→Z,8→B)
-        String lettersBias = base
+        String lettersBias = compact
                 .replace('0','O').replace('1','I').replace('5','S').replace('2','Z').replace('8','B');
         //    b) цифровая: буквы, похожие на цифры → цифры (O→0,I→1,S→5,Z→2,B→8)
-        String digitsBias = base
+        String digitsBias = compact
                 .replace('O','0').replace('I','1').replace('S','5').replace('Z','2').replace('B','8');
 
         // 2) СНАЧАЛА пробуем чистый generic на исходной строке
         String p;
-        if ((p = extractGenericPlate(base))  != null) return p;
+        if ((p = extractGenericPlate(compact))  != null) return p;
         // затем RU на исходной и цифровой
-        if ((p = extractRuPlate(base))       != null) return p;
+        if ((p = extractRuPlate(compact))       != null) return p;
         if ((p = extractRuPlate(digitsBias)) != null) return p;
 
         // 3) generic на bias-вариантах
         if ((p = extractGenericPlate(lettersBias)) != null) return p;
         if ((p = extractGenericPlate(digitsBias))  != null) return p;
 
+        // 4) короткий generic LLDDDD (например, BE8624) — когда хвостовые 2 буквы отсутствуют/нечитаемы
+        if ((p = extractGenericShortPlate(compact))     != null) return p;
+        if ((p = extractGenericShortPlate(lettersBias)) != null) return p;
+        if ((p = extractGenericShortPlate(digitsBias))  != null) return p;
         return null;
     }
 
@@ -734,10 +741,29 @@ public final class BucketDetector {
         return null;
     }
 
+    /** Короткий generic: LL DDDD (например, BE8624). Буквы ограничиваем RU_LAT_SET для снижения ложных срабатываний. */
+    private static String extractGenericShortPlate(String s) {
+        if (s == null) return null;
+        for (int i = 0; i + 6 <= s.length(); i++) {
+            char L0 = toLatLetterSlotGeneric(safe(s,i));
+            char L1 = toLatLetterSlotGeneric(safe(s,i+1));
+            if (L0==0 || L1==0) continue;
+            if (!isRuLatLetter(L0) || !isRuLatLetter(L1)) continue;
+            char D2 = toDigitSlotGeneric(safe(s,i+2));
+            char D3 = toDigitSlotGeneric(safe(s,i+3));
+            char D4 = toDigitSlotGeneric(safe(s,i+4));
+            char D5 = toDigitSlotGeneric(safe(s, i+5));
+            if (D2!=0 && D3!=0 && D4!=0 && D5!=0) {
+                return "" + L0 + L1 + D2 + D3 + D4 + D5;
+            }
+        }
+        return null;
+    }
+
     /** Разрешённые буквы для RU (латинские двойники): A B E K M H O P C T Y X */
     private static final String RU_LAT_SET = "ABEKMHOPCTYX";
     private static boolean isDigit(char c) { return c >= '0' && c <= '9'; }
-    private static boolean isRuLatLetter(char c) { return RU_LAT_SET.indexOf(c) > 0; }
+    private static boolean isRuLatLetter(char c) { return RU_LAT_SET.indexOf(c) >= 0; }
     private static char safe(String s, int i) { return i < s.length() ? s.charAt(i) : '\0'; }
 
     /** Слот букв RU: кириллица→латиница, цифры-похожие→буквы; возвращает 0 если неподходящее. */
