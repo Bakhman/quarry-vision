@@ -82,7 +82,7 @@ public final class Pg {
     /** Вставить detection с событиями, вернуть id. */
     public static int insertDetection(int videoId, int mergeMs, List<Instant> stamps) {
         final String insDet = "insert into detections(video_id, merge_ms, events_count) values(?,?,?) returning id";
-        final String insEvt = "insert into events(detection_id, t_ms) values (?,?)";
+        final String insEvt = "insert into events(detection_id, t_ms, plate) values (?,?,?)";
         try (Connection c = get()) {
             c.setAutoCommit(false);
             int detId;
@@ -100,6 +100,7 @@ public final class Pg {
                     for (Instant t: stamps) {
                         ps.setInt(1, detId);
                         ps.setLong(2, t.toEpochMilli());
+                        ps.setNull(3, java.sql.Types.VARCHAR); // plate пока не протянут сюда — пишем NULL
                         ps.addBatch();
                     }
                     ps.executeBatch();
