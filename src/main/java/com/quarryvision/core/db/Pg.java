@@ -81,6 +81,10 @@ public final class Pg {
 
     /** Вставить detection с событиями, вернуть id. */
     public static int insertDetection(int videoId, int mergeMs, List<Instant> stamps) {
+        return insertDetection(videoId, mergeMs, stamps, null);
+    }
+    /** Вставить detection с событиями, (+ plate  на каждое событие), вернуть id. */
+    public static int insertDetection(int videoId, int mergeMs, List<Instant> stamps, List<String> plates) {
         final String insDet = "insert into detections(video_id, merge_ms, events_count) values(?,?,?) returning id";
         final String insEvt = "insert into events(detection_id, t_ms, plate) values (?,?,?)";
         try (Connection c = get()) {
@@ -97,11 +101,21 @@ public final class Pg {
             }
             if (stamps != null && !stamps.isEmpty()) {
                 try (PreparedStatement ps = c.prepareStatement(insEvt)) {
+                    int i = 0;
                     for (Instant t: stamps) {
                         ps.setInt(1, detId);
                         ps.setLong(2, t.toEpochMilli());
-                        ps.setNull(3, java.sql.Types.VARCHAR); // plate пока не протянут сюда — пишем NULL
+                        String plate = null;
+                        if (plates != null && i < plates.size()) {
+                            plate = plates.get(i);
+                        }
+                        if (plate == null || plate.isBlank()) {
+                            ps.setNull(3, Types.VARCHAR);
+                        } else {
+                            ps.setString(3, plate);
+                        }
                         ps.addBatch();
+                        i++;
                     }
                     ps.executeBatch();
                 }
