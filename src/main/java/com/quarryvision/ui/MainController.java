@@ -110,7 +110,7 @@ public class MainController {
                             dc.trace());
                     var res = det.detect(p);
                     int videoId = Pg.upsertVideo(p, res.fps(), res.frames());
-                    int detId = Pg.insertDetection(videoId, det.effectiveMergeMs(), res.timestampsMs());
+                    int detId = Pg.insertDetection(videoId, det.effectiveMergeMs(), res.timestampsMs(), res.platesOrEmpty());
 
                     // аккуратно считаем trips, чтобы ошибка сегментации не ломала Detect
                     List<TripSegment> trips;
@@ -423,7 +423,7 @@ public class MainController {
                 int mergeMs = det.effectiveMergeMs();
 
                 // 5) Сохраняем детекцию и события
-                int detId = Pg.insertDetection(videoId, mergeMs, dr.timestampsMs());
+                int detId = Pg.insertDetection(videoId, mergeMs, dr.timestampsMs(), dr.platesOrEmpty());
                 onProgress.accept(100);
 
                 // считаем рейсы по DetectionResult с защитой
