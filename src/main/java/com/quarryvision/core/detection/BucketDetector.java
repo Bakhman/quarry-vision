@@ -409,10 +409,13 @@ public final class BucketDetector {
 
         int h = bgr.rows(), w = bgr.cols();
         // сетка по X и размерам: центр и соседние позиции
-        double[] fxList = {0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65};
-        double[] fwList = {0.14, 0.18, 0.22};
-        double[] fyList = {0.88, 0.90, 0.92, 0.93};
-        double[] fhList = {0.05, 0.06, 0.07};
+        // Важно для fast-режима: первые N ROI должны покрывать разные fy/fh,
+        // иначе при maxRoiPerScan мы можем вообще не дойти до "правильной" высоты номера.
+        // Поэтому: (1) сначала центр/типовые размеры, (2) перестраиваем порядок циклов ниже.
+        double[] fxList = {0.45, 0.50, 0.40, 0.55, 0.35, 0.60, 0.30, 0.65, 0.25};
+        double[] fwList = {0.18, 0.22, 0.14};
+        double[] fyList = {0.92, 0.90, 0.93, 0.88};
+        double[] fhList = {0.06, 0.07, 0.05};
 
         String best = null;
         int bestScore = -1;
@@ -427,10 +430,10 @@ public final class BucketDetector {
         final int maxRoiPerScan = OCR_FAST_MODE ? 80 : Integer.MAX_VALUE;
 
         outer:
-        for (double fy : fyList)
-            for (double fh : fhList)
-                for (double fx : fxList)
-                    for (double fw : fwList) {
+        for (double fx : fxList)
+            for (double fw : fwList)
+                for (double fy : fyList)
+                    for (double fh : fhList) {
                         if (OCR_FAST_MODE && roiIdx >= maxRoiPerScan) {
                             if (log.isDebugEnabled()) {
                                 log.debug("OCR: reached maxRoiPerScan={} (roiIdx={}), stop scanning plate ROI, best='{}', bestScore={}",
