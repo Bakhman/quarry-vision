@@ -452,20 +452,27 @@ public final class BucketDetector {
                         // Не выбрасываем кириллицу — оставляем A-Z, 0-9 и А-ЯЁ, как в OcrService
                         String cleaned = got.toUpperCase().replaceAll("[^A-Z0-9А-ЯЁ]", "");
                         String norm = normalizePlate(cleaned);
-                        int score = (norm != null ? 100 : cleaned.length()); // валидный шаблон — максимум
+                        // Важно: score=100 слишком "плоский" — любой валидный шаблон (включая ложный RU)
+                        // мгновенно обрывает сканирование. Поэтому:
+                        // 1) даём валидным номерам базу 100 + длина (8-символьный выигрывает у 6-символьного)
+                        // 2) ранний выход допускаем только для "длинного" номера (>= 8), иначе продолжаем скан.
+                        int score = (norm != null ? 100 + norm.length() : cleaned.length()); // валидный шаблон — максимум
                         String candidate = (norm != null ? norm : cleaned);
                         if (log.isDebugEnabled()) {
                             log.debug("OCR roi#{} rect=({}, {}, {}, {}): raw='{}' cleaned='{}' norm='{}' score='{}'",
                                     roiIdx - 1, rx, ry, rw, rh, got, cleaned, norm, score);
                         }
-                        if (score > bestScore) {
+                        if (score > bestScore || (score == bestScore && best != null && candidate.length() > best.length())) {
                             bestScore = score;
                             best = candidate;
                             if (log.isDebugEnabled()) {
                                 log.debug("OCR: new best='{}' score={} at roi#{}", best, bestScore, roiIdx - 1);
                             }
                         }
-                        if (bestScore >= 100) return best; // нашли валидный LLDDDDLL
+
+                        // Ранний выход — только если нашли "длинный" номер (например, LLDDDDLL = 8),
+                        // иначе продолжаем сканировать ROI, чтобы не зафиксировать ложный 6-символьный RU.
+                        if (norm != null && norm.length() >= 8) return norm;
                     }
         if (log.isDebugEnabled()) {
             log.debug("OCR best='{}' score={}", best, bestScore);
