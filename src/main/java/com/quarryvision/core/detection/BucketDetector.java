@@ -514,7 +514,9 @@ public final class BucketDetector {
         // оценка контраста ROI через стандартное отклонение яркости
         Mat mean = new Mat();
         Mat stddev = new Mat();
-        opencv_core.meanStdDev(gray, mean, stddev);
+        // В FAST-режиме решение "дропать ROI" зависит от контраста.
+        // Контраст корректнее считать ПОСЛЕ CLAHE, иначе ROI с номером часто ошибочно попадает в lowContrast.
+        opencv_core.meanStdDev(eq, mean, stddev);
         double contrast = stddev.createIndexer().getDouble(0) / 255.0;
         // пороги управляемы через -Dqv.ocr.minContrast / -Dqv.ocr.fillMin / -Dqv.ocr.fillMax
         double minContrast = Double.parseDouble(System.getProperty("qv.ocr.minContrast", "0.10"));
