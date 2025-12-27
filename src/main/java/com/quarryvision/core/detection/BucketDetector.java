@@ -427,14 +427,16 @@ public final class BucketDetector {
         }
 
         // В fast-режиме ограничиваем кол-во ROI, чтобы не дергать OCR сотни раз
-        final int maxRoiPerScan = OCR_FAST_MODE ? 80 : Integer.MAX_VALUE;
+        final int maxRoiPerScan = Integer.getInteger(
+                "qv.ocr.maxRoiPerScan",
+                OCR_FAST_MODE ? 80 : Integer.MAX_VALUE);
 
         outer:
         for (double fx : fxList)
             for (double fw : fwList)
                 for (double fy : fyList)
                     for (double fh : fhList) {
-                        if (OCR_FAST_MODE && roiIdx >= maxRoiPerScan) {
+                        if (roiIdx >= maxRoiPerScan) {
                             if (log.isDebugEnabled()) {
                                 log.debug("OCR: reached maxRoiPerScan={} (roiIdx={}), stop scanning plate ROI, best='{}', bestScore={}",
                                         maxRoiPerScan, roiIdx, best, bestScore);
