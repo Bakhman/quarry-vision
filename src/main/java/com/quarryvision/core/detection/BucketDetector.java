@@ -263,15 +263,11 @@ public final class BucketDetector {
                                     // OCR-хук: один снимок в середине события
                                     if (ocr != null) {
                                         try {
-                                            Mat snap = readFrameAt(cap, mid);
-                                            if (snap != null && !snap.empty()) {
-                                                this.ocrCallsThisDetect = 0; // reset budget per plate scan (каждое событие)
-                                                plate = tryOcrPlate(ocr, snap);
-                                                if (plate != null && !plate.isBlank()) {
-                                                    log.info("OCR plate@{}ms: {}", ms, plate);
-                                                } else {
-                                                    log.debug("OCR no plate @{}ms", ms);
-                                                }
+                                            plate = tryOcrPlateAroundEvent(ocr, cap, mid, fps, frameCount);
+                                            if (plate != null && !plate.isBlank()) {
+                                                log.info("OCR plate@{}ms: {}", ms, plate);
+                                            } else {
+                                                log.debug("OCR no plate @{}ms", ms);
                                             }
                                         } catch (Throwable t) {
                                             log.debug("OCR hook failed: {}", t.toString());
@@ -343,6 +339,54 @@ public final class BucketDetector {
                 }
             }
         }
+    }
+
+    /**
+     * Попытка OCR не только в mid кадре события, а на нескольких кадрах вокруг него.
+     * Управление через system property:
+     *   -Dqv.ocr.eventOffsetsSec=0,-4,4   (по умолчанию)
+     *
+     * Идея: на реальном видео mid кадр часто не лучший (перекрытия/смаз/угол),
+     * а за 3–5 секунд до/после номер бывает читаемее.
+     */
+    private String tryOcrPlateAroundEvent(OcrService ocr, VideoCapture cap,
+                                          long midFrame, double fps, long frameCount) {
+        String offs = System.getProperty("qv.ocr.eventOffsetsSec", "0,-4,4");
+        String[] parts = offs.split(",");
+        for (String p : parts) {
+            int sec;
+            try {
+                sec = Integer.parseInt(p.trim());
+            } catch (Exception ignore) {
+                continue;
+            }
+            long f = midFrame + Math.round(sec * fps);
+            f = clampLong(f, 0, Math.max(0, frameCount - 1));
+            Mat snap = null;
+            try {
+                snap = readFrameAt(cap, f);
+                if (snap == null || snap.empty()) continue;
+                this.ocrCallsThisDetect = 0; // бюджет OCR — на одну попытку кадра
+                String plate = tryOcrPlate(ocr, snap);
+                if (plate != null && !plate.isBlank()) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("OCR: plate candidate '{}' at offsetSec={} (frame={})", plate, sec, f);
+                    }
+                    return plate;
+                }
+            } catch (Throwable ignore) {
+                // молча продолжаем на следующий offset
+            } finally {
+                if (snap != null) snap.release();
+            }
+        }
+        return null;
+    }
+
+    private static long clampLong(long v, long min, long max) {
+        if (v < min) return min;
+        if (v > max) return max;
+        return v;
     }
 
     private record MergedEvents(List<Instant> times, List<String> plates) {}
