@@ -464,7 +464,10 @@ public final class BucketDetector {
                             log.debug("OCR roi#{} rect=({}, {}, {}, {}): raw='{}' cleaned='{}' norm='{}' score='{}'",
                                     roiIdx - 1, rx, ry, rw, rh, got, cleaned, norm, score);
                         }
-                        if (score > bestScore || (score == bestScore && best != null && candidate.length() > best.length())) {
+                        if (score > bestScore
+                                || (score == bestScore && (best == null
+                                || candidate.length() > best.length()
+                                || (candidate.length() == best.length() && preferOnTie(candidate, best))))) {
                             bestScore = score;
                             best = candidate;
                             if (log.isDebugEnabled()) {
@@ -871,6 +874,49 @@ public final class BucketDetector {
         else if (ch=='E') ch='6';
         else if (ch=='A') ch='4';
         return isDigit(ch) ? ch : 0;
+    }
+
+    /**
+     * Tie-breaker при равном score и равной длине:
+     * generic (LLDDDDLL / LLDDDD) > RU core (LDDDLL).
+     * Нужен, чтобы при одинаковом "весе" не закреплялся случайный RU-ложняк,
+     * если найден осмысленный generic-кандидат.
+     */
+    private static boolean preferOnTie(String candidate, String best) {
+        return plateKind(candidate) > plateKind(best);
+    }
+
+    // 3 = generic full (LLDDDDLL), 2 = generic short (LLDDDD), 1 = RU core (LDDDLL), 0 = unknown
+    private static int plateKind(String p) {
+        if (p == null) return 0;
+        if (isGenericFull(p))   return 3;
+        if (isGenericShort(p))  return 2;
+        if (isRuCore(p))        return 1;
+        return 0;
+    }
+
+    private static boolean isAz(char c) {
+        return c >= 'A' && c <= 'Z';
+    }
+
+    private static boolean isGenericShort(String p) {
+        if (p.length() != 6) return false;
+        return isAz(p.charAt(0)) && isAz(p.charAt(1))
+                && isDigit(p.charAt(2)) && isDigit(p.charAt(3)) && isDigit(p.charAt(4)) && isDigit(p.charAt(5));
+    }
+
+    private static boolean isGenericFull(String p) {
+        if (p.length() != 8) return false;
+        return isAz(p.charAt(0)) && isAz(p.charAt(1))
+                && isDigit(p.charAt(2)) && isDigit(p.charAt(3)) && isDigit(p.charAt(4)) && isDigit(p.charAt(5))
+                && isAz(p.charAt(6)) && isAz(p.charAt(7));
+    }
+
+    private static boolean isRuCore(String p) {
+        if (p.length() != 6) return false;
+        return isRuLatLetter(p.charAt(0))
+                && isDigit(p.charAt(1)) && isDigit(p.charAt(2)) && isDigit(p.charAt(3))
+                && isRuLatLetter(p.charAt(4)) && isRuLatLetter(p.charAt(5));
     }
 
     public int effectiveMergeMs() {
