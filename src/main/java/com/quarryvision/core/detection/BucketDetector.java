@@ -127,8 +127,16 @@ public final class BucketDetector {
     }
 
     public DetectionResult detect(Path videoPath) {
+        // PERF (PR-0): baseline timings/counters for video processing
+        final long perfStartNs = System.nanoTime();
         // Счётчик используется как лимит на одну попытку распознавания номера (plate scan).
         this.ocrCallsThisDetect = 0;
+        this.perfOcrCallsTotal = 0;
+        this.perfOcrNsTotal = 0;
+        this.perfOcrRoiNsTotal = 0;
+        this.perfRoiAttemptsTotal = 0;
+        this.perfRoiDroppedFast = 0;
+        this.perfSnapReads = 0;
         final boolean ocrEnabled = Boolean.getBoolean("qv.ocr.init");
         final OcrService ocr = ocrEnabled ? new OcrService(
                 new OcrService.Config(
@@ -155,6 +163,7 @@ public final class BucketDetector {
             return new DetectionResult(videoPath, 0, List.of(), 0.0, 0);
         }
         try (VideoCapture cap = new VideoCapture(videoPath.toString())) {
+            final long perfAfterOpenNs = System.nanoTime();
             if (!cap.isOpened()) {
                 log.error("VideoCapture cannot open: {}", videoPath);
                 return new DetectionResult(videoPath, 0, List.of(), 0.0, 0);
@@ -197,6 +206,7 @@ public final class BucketDetector {
             double thrHigh = eventRatio;
             double thrLow = Math.max(1e-6, eventRatio * thrLowFactor);
             long minActiveFrames = Math.max(1L, Math.round((minActiveMs / 1000.0) * fps));
+            final long perfLoopStartNs = System.nanoTime();
 
             try {// первый кадр
                 if (!cap.read(prev) || prev.empty()) {
@@ -328,7 +338,39 @@ public final class BucketDetector {
                 List<Instant> mergedTimes = List.copyOf(merged.times);
                 // а в plates могут быть null → делаем обычную копию
                 List<String> mergedPlates = new ArrayList<>(merged.plates);
-                return new DetectionResult(videoPath, mergedTimes.size(), mergedTimes, fps, frameCount, mergedPlates);
+                DetectionResult out = new DetectionResult(videoPath, mergedTimes.size(), mergedTimes, fps, frameCount, mergedPlates);
+
+                final long perfEndNs = System.nanoTime();
+                long totalMs = (perfEndNs - perfStartNs) / 1_000_000L;
+                long openMs  = (perfAfterOpenNs - perfStartNs) / 1_000_000L;
+                long loopMs  = (perfEndNs - perfLoopStartNs) / 1_000_000L;
+
+                long ocrRoiMs = this.perfOcrRoiNsTotal / 1_000_000L;
+                long ocrMs    = this.perfOcrNsTotal / 1_000_000L;
+                long ocrCalls = this.perfOcrCallsTotal;
+                long ocrAvgMs = (ocrCalls > 0) ? (ocrMs / ocrCalls) : 0;
+
+                final int maxRoiPerScan = Integer.getInteger(
+                        "qv.ocr.maxRoiPerScan",
+                        OCR_FAST_MODE ? 80 : Integer.MAX_VALUE);
+                final String eventOffsetsSec = System.getProperty("qv.ocr.eventOffsetsSec", "0,-4,4");
+
+                log.info("PERF {{video='{}', totalMs={}, openMs{}, loopMs{}, fps={}, frames={}, events={}, ocrEnabled={}, snapReads={}, roiAttempts={}, roiDroppedFast={}, ocrCalls={}, ocrRoiMs={}, ocrMs={}, ocrAvgMs={}, stepFrames={}, maxRoiPerScan={}, eventOffsetsSec='{}'}}",
+                        videoPath.getFileName(),
+                        totalMs, openMs, loopMs,
+                        fps, frameCount, mergedTimes.size(),
+                        (ocr != null),
+                        this.perfSnapReads,
+                        this.perfRoiAttemptsTotal,
+                        this.perfRoiDroppedFast,
+                        ocrCalls,
+                        ocrRoiMs,
+                        ocrMs,
+                        ocrAvgMs,
+                        stepFrames,
+                        maxRoiPerScan,
+                        eventOffsetsSec);
+                return out;
             } finally {
                 // гарантированное освобождение нативной памяти
                 release(prev, frame, grayPrev, gray, diff, kernel);
@@ -364,6 +406,7 @@ public final class BucketDetector {
             f = clampLong(f, 0, Math.max(0, frameCount - 1));
             Mat snap = null;
             try {
+                this.perfSnapReads++;
                 snap = readFrameAt(cap, f);
                 if (snap == null || snap.empty()) continue;
                 this.ocrCallsThisDetect = 0; // бюджет OCR — на одну попытку кадра
@@ -534,165 +577,197 @@ public final class BucketDetector {
     private int ocrCallsThisDetect = 0;
 
     private String ocrOnceOnRoi(OcrService ocr, Mat bgr, Rect r, String tag) {
-        if (this.ocrCallsThisDetect >= MAX_OCR_CALLS_PER_DETECT) {
-            if (log.isDebugEnabled()) {
-                log.debug("OCR: skip ROI {} because MAX_OCR_CALLS_PER_DETECT={} reached (rect({}, {}, {}, {}))",
-                        tag, MAX_OCR_CALLS_PER_DETECT, r.x(), r.y(), r.width(), r.height());
-            }
-            return null;
-        }
-        Mat roi = new Mat(bgr, r).clone();
-        Mat gray = new Mat(); opencv_imgproc.cvtColor(roi, gray, opencv_imgproc.COLOR_BGR2GRAY);
-        var clahe = opencv_imgproc.createCLAHE(2.0, new Size(8,8));
-        Mat eq = new Mat(); clahe.apply(gray, eq);
-        Mat den = new Mat(); opencv_imgproc.bilateralFilter(eq, den, 5, 75, 75);
-        Mat up = new Mat(); opencv_imgproc.resize(den, up, new Size(den.cols()*2, den.rows()*2));
-        // первичная бинаризация (управляется флагами)
-        int b1 = Integer.getInteger("qv.ocr.adaptBlock", 31);
-        int c1 = Integer.getInteger("qv.ocr.adaptC", 5);
-        if ((b1 & 1) == 0) b1++; // blockSize должен быть нечётным
-        Mat bin = new Mat();
-        opencv_imgproc.adaptiveThreshold(
-                up, bin, 255,
-                opencv_imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
-                opencv_imgproc.THRESH_BINARY, b1, c1);
-        // морфология для склейки разрывов символов
-        Mat k = opencv_imgproc.getStructuringElement(opencv_imgproc.MORPH_RECT, new Size(3,3));
-        opencv_imgproc.morphologyEx(bin, bin, opencv_imgproc.MORPH_CLOSE, k);
-        double fill = opencv_core.countNonZero(bin)/(double)(bin.rows()*bin.cols());
-        // оценка контраста ROI через стандартное отклонение яркости
-        Mat mean = new Mat();
-        Mat stddev = new Mat();
-        // В FAST-режиме решение "дропать ROI" зависит от контраста.
-        // Контраст корректнее считать ПОСЛЕ CLAHE, иначе ROI с номером часто ошибочно попадает в lowContrast.
-        opencv_core.meanStdDev(eq, mean, stddev);
-        double contrast = stddev.createIndexer().getDouble(0) / 255.0;
-        // пороги управляемы через -Dqv.ocr.minContrast / -Dqv.ocr.fillMin / -Dqv.ocr.fillMax
-        double minContrast = Double.parseDouble(System.getProperty("qv.ocr.minContrast", "0.10"));
-        double fillMin     = Double.parseDouble(System.getProperty("qv.ocr.fillMin", "0.01"));
-        double fillMax     = Double.parseDouble(System.getProperty("qv.ocr.fillMax", "0.90"));
-        boolean lowContrast = contrast < minContrast;
-        boolean badFill = (fill < fillMin || fill > fillMax);
-        boolean needFallback = badFill || lowContrast;
-        if (needFallback && OCR_FAST_MODE) {
-            // FAST-режим: ROI явно "плохой" по заполнению/контрасту — даже не зовём OCR
-            if (log.isDebugEnabled()) {
-                log.debug("OCR fast: drop ROI after primary bin (badFill={}, lowContrast={}, " +
-                        "fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {})",
-                        badFill, lowContrast,
-                        String.format("%.3f", fill),
-                        String.format("%.3f", contrast),
-                        String.format("%.3f", minContrast),
-                        String.format("%.3f", fillMin),
-                        String.format("%.3f", fillMax),
-                        r.x(), r.y(), r.width(), r.height());
-            }
-            release(k, bin, up, den, eq, gray, roi);
-            return null;
-        }
-        if (needFallback) {
-            // альтернативная адаптивная бинаризация с более крупным окном
-            int b2 = Integer.getInteger("qv.ocr.adaptBlock2", 41);
-            int c2 = Integer.getInteger("qv.ocr.adaptC2", 2);
-            if ((b2 & 1)== 0) b2++;
-            Mat bin2 = new Mat();
-            opencv_imgproc.adaptiveThreshold(
-                    up, bin2, 255,
-                    opencv_imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
-                    opencv_imgproc.THRESH_BINARY, b2, c2);
-            double fill2 = opencv_core.countNonZero(bin2)/(double)(bin2.rows()*bin2.cols());
-            if (fill2 >= fillMin && fill2 <= fillMax) {
-                if (log.isDebugEnabled()) {
-                    log.debug("OCR fallback#1 OK (fill2={}) rect=({}, {}, {}, {})",
-                            String.format("%.3f", fill2), r.x(), r.y(), r.width(), r.height());
-                }
-                bin.release(); bin = bin2; fill = fill2;
-                needFallback = false;
-            } else {
-                bin2.release();
-            }
-        }
-        if (needFallback) {
-            // Otsu как последний вариант
-            Mat bin3 = new Mat();
-            opencv_imgproc.threshold(up, bin3, 0, 255, opencv_imgproc.THRESH_BINARY + opencv_imgproc.THRESH_OTSU);
-            double fill3 = opencv_core.countNonZero(bin3)/(double)(bin3.rows()*bin3.cols());
-            if (fill3 >= fillMin && fill3 <= fillMax) {
-                if (log.isDebugEnabled()) {
-                    log.debug("OCR fallback#2 Otsu OK (fill3={}) rect({}, {}, {}, {})",
-                            String.format("%.3f", fill3), r.x(), r.y(), r.width(), r.height());
-                }
-                bin.release(); bin = bin3; fill = fill3;
-                needFallback = false;
-            } else {
-                bin3.release();
-            }
-
-        }
-        if (needFallback) {
-            boolean badFillFinal = (fill < fillMin || fill > fillMax);
-            boolean lowContrastFinal =  contrast < minContrast;
-            if (log.isDebugEnabled()) {
-                log.debug("OCR drop ROI after fallbacks (badFill={}, lowContrast={}, "
-                            + "fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {})",
-                        badFillFinal, lowContrastFinal,
-                        String.format("%.3f", fill),
-                        String.format("%.3f", contrast),
-                        String.format("%.3f", minContrast),
-                        String.format("%.3f", fillMin),
-                        String.format("%.3f", fillMax),
-                        r.x(), r.y(), r.width(), r.height());
-            }
-            release(k, bin, up, den, eq, gray, roi);
-            return null;
-        }
-        BytePointer buf = new BytePointer();
-        boolean ok = opencv_imgcodecs.imencode(".png", bin, buf);
-        if (!ok) { release(k, bin, up, den, eq, gray, roi); return null; }
-        byte[] bytes = new byte[(int)buf.limit()]; buf.get(bytes);
+        final long roiStartNs = System.nanoTime();
+        this.perfRoiAttemptsTotal++;
         try {
-            BufferedImage bi = ImageIO.read(new ByteArrayInputStream(bytes));
-            // сначала пробуем самый уверенный токен, потом общий текст
-            this.ocrCallsThisDetect++;
-            if (log.isDebugEnabled()) {
-                log.debug("OCR call #{} for ROI {} (rect=({}, {}, {}, {}))",
-                        this.ocrCallsThisDetect,
-                        tag, r.x(), r.y(), r.width(), r.height());
-            }
-            String raw = ocr.readBestToken(bi).orElse(null);
-            if (raw == null) {
-                if (!OCR_FAST_MODE) {
-                    // Fallback: инверсия бинарного изображения и повторная попытка
-                    Mat binInv = new Mat();
-                    opencv_core.bitwise_not(bin, binInv);
-                    BytePointer buf2 = new BytePointer();
-                    boolean ok2 = opencv_imgcodecs.imencode(".png", binInv, buf2);
-                    if (ok2) {
-                        if (log.isDebugEnabled()) {
-                            log.debug("OCR fallback invert: call #{} for ROI {} (rect=({}, {}, {}, {}))",
-                                    this.ocrCallsThisDetect + 1,
-                                    tag, r.x(), r.y(), r.width(), r.height());
-                        }
-                        byte[] b2 = new byte[(int) buf2.limit()];
-                        buf2.get(b2);
-                        BufferedImage bi2 = ImageIO.read(new ByteArrayInputStream(b2));
-                        this.ocrCallsThisDetect++;
-                        raw = ocr.readBestToken(bi2).orElse(null);
-                    }
-                    buf2.deallocate();
-                    binInv.release();
+            if (this.ocrCallsThisDetect >= MAX_OCR_CALLS_PER_DETECT) {
+                if (log.isDebugEnabled()) {
+                    log.debug("OCR: skip ROI {} because MAX_OCR_CALLS_PER_DETECT={} reached (rect({}, {}, {}, {}))",
+                            tag, MAX_OCR_CALLS_PER_DETECT, r.x(), r.y(), r.width(), r.height());
                 }
-                if (raw == null) return null;
+                return null;
             }
-            return raw.trim();
-        } catch (Exception ignore) {
-            return null;
+            Mat roi = new Mat(bgr, r).clone();
+            Mat gray = new Mat();
+            opencv_imgproc.cvtColor(roi, gray, opencv_imgproc.COLOR_BGR2GRAY);
+            var clahe = opencv_imgproc.createCLAHE(2.0, new Size(8, 8));
+            Mat eq = new Mat();
+            clahe.apply(gray, eq);
+            Mat den = new Mat();
+            opencv_imgproc.bilateralFilter(eq, den, 5, 75, 75);
+            Mat up = new Mat();
+            opencv_imgproc.resize(den, up, new Size(den.cols() * 2, den.rows() * 2));
+            // первичная бинаризация (управляется флагами)
+            int b1 = Integer.getInteger("qv.ocr.adaptBlock", 31);
+            int c1 = Integer.getInteger("qv.ocr.adaptC", 5);
+            if ((b1 & 1) == 0) b1++; // blockSize должен быть нечётным
+            Mat bin = new Mat();
+            opencv_imgproc.adaptiveThreshold(
+                    up, bin, 255,
+                    opencv_imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
+                    opencv_imgproc.THRESH_BINARY, b1, c1);
+            // морфология для склейки разрывов символов
+            Mat k = opencv_imgproc.getStructuringElement(opencv_imgproc.MORPH_RECT, new Size(3, 3));
+            opencv_imgproc.morphologyEx(bin, bin, opencv_imgproc.MORPH_CLOSE, k);
+            double fill = opencv_core.countNonZero(bin) / (double) (bin.rows() * bin.cols());
+            // оценка контраста ROI через стандартное отклонение яркости
+            Mat mean = new Mat();
+            Mat stddev = new Mat();
+            // В FAST-режиме решение "дропать ROI" зависит от контраста.
+            // Контраст корректнее считать ПОСЛЕ CLAHE, иначе ROI с номером часто ошибочно попадает в lowContrast.
+            opencv_core.meanStdDev(eq, mean, stddev);
+            double contrast = stddev.createIndexer().getDouble(0) / 255.0;
+            // пороги управляемы через -Dqv.ocr.minContrast / -Dqv.ocr.fillMin / -Dqv.ocr.fillMax
+            double minContrast = Double.parseDouble(System.getProperty("qv.ocr.minContrast", "0.10"));
+            double fillMin = Double.parseDouble(System.getProperty("qv.ocr.fillMin", "0.01"));
+            double fillMax = Double.parseDouble(System.getProperty("qv.ocr.fillMax", "0.90"));
+            boolean lowContrast = contrast < minContrast;
+            boolean badFill = (fill < fillMin || fill > fillMax);
+            boolean needFallback = badFill || lowContrast;
+            if (needFallback && OCR_FAST_MODE) {
+                // FAST-режим: ROI явно "плохой" по заполнению/контрасту — даже не зовём OCR
+                this.perfRoiDroppedFast++;
+                if (log.isDebugEnabled()) {
+                    log.debug("OCR fast: drop ROI after primary bin (badFill={}, lowContrast={}, " +
+                                    "fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {})",
+                            badFill, lowContrast,
+                            String.format("%.3f", fill),
+                            String.format("%.3f", contrast),
+                            String.format("%.3f", minContrast),
+                            String.format("%.3f", fillMin),
+                            String.format("%.3f", fillMax),
+                            r.x(), r.y(), r.width(), r.height());
+                }
+                release(k, bin, up, den, eq, gray, roi);
+                return null;
+            }
+            if (needFallback) {
+                // альтернативная адаптивная бинаризация с более крупным окном
+                int b2 = Integer.getInteger("qv.ocr.adaptBlock2", 41);
+                int c2 = Integer.getInteger("qv.ocr.adaptC2", 2);
+                if ((b2 & 1) == 0) b2++;
+                Mat bin2 = new Mat();
+                opencv_imgproc.adaptiveThreshold(
+                        up, bin2, 255,
+                        opencv_imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
+                        opencv_imgproc.THRESH_BINARY, b2, c2);
+                double fill2 = opencv_core.countNonZero(bin2) / (double) (bin2.rows() * bin2.cols());
+                if (fill2 >= fillMin && fill2 <= fillMax) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("OCR fallback#1 OK (fill2={}) rect=({}, {}, {}, {})",
+                                String.format("%.3f", fill2), r.x(), r.y(), r.width(), r.height());
+                    }
+                    bin.release();
+                    bin = bin2;
+                    fill = fill2;
+                    needFallback = false;
+                } else {
+                    bin2.release();
+                }
+            }
+            if (needFallback) {
+                // Otsu как последний вариант
+                Mat bin3 = new Mat();
+                opencv_imgproc.threshold(up, bin3, 0, 255, opencv_imgproc.THRESH_BINARY + opencv_imgproc.THRESH_OTSU);
+                double fill3 = opencv_core.countNonZero(bin3) / (double) (bin3.rows() * bin3.cols());
+                if (fill3 >= fillMin && fill3 <= fillMax) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("OCR fallback#2 Otsu OK (fill3={}) rect({}, {}, {}, {})",
+                                String.format("%.3f", fill3), r.x(), r.y(), r.width(), r.height());
+                    }
+                    bin.release();
+                    bin = bin3;
+                    fill = fill3;
+                    needFallback = false;
+                } else {
+                    bin3.release();
+                }
+
+            }
+            if (needFallback) {
+                boolean badFillFinal = (fill < fillMin || fill > fillMax);
+                boolean lowContrastFinal = contrast < minContrast;
+                if (log.isDebugEnabled()) {
+                    log.debug("OCR drop ROI after fallbacks (badFill={}, lowContrast={}, "
+                                    + "fill={}, contrast={}, minC={}, fMin={}, fMax={}) rect({}, {}, {}, {})",
+                            badFillFinal, lowContrastFinal,
+                            String.format("%.3f", fill),
+                            String.format("%.3f", contrast),
+                            String.format("%.3f", minContrast),
+                            String.format("%.3f", fillMin),
+                            String.format("%.3f", fillMax),
+                            r.x(), r.y(), r.width(), r.height());
+                }
+                release(k, bin, up, den, eq, gray, roi);
+                return null;
+            }
+            BytePointer buf = new BytePointer();
+            boolean ok = opencv_imgcodecs.imencode(".png", bin, buf);
+            if (!ok) {
+                release(k, bin, up, den, eq, gray, roi);
+                return null;
+            }
+            byte[] bytes = new byte[(int) buf.limit()];
+            buf.get(bytes);
+            try {
+                BufferedImage bi = ImageIO.read(new ByteArrayInputStream(bytes));
+                // сначала пробуем самый уверенный токен, потом общий текст
+                this.ocrCallsThisDetect++;
+                this.perfOcrCallsTotal++;
+                if (log.isDebugEnabled()) {
+                    log.debug("OCR call #{} for ROI {} (rect=({}, {}, {}, {}))",
+                            this.ocrCallsThisDetect,
+                            tag, r.x(), r.y(), r.width(), r.height());
+                }
+                final long ocrStartNs = System.nanoTime();
+                String raw = ocr.readBestToken(bi).orElse(null);
+                this.perfOcrNsTotal += (System.nanoTime() - ocrStartNs);
+                if (raw == null) {
+                    if (!OCR_FAST_MODE) {
+                        // Fallback: инверсия бинарного изображения и повторная попытка
+                        Mat binInv = new Mat();
+                        opencv_core.bitwise_not(bin, binInv);
+                        BytePointer buf2 = new BytePointer();
+                        boolean ok2 = opencv_imgcodecs.imencode(".png", binInv, buf2);
+                        if (ok2) {
+                            if (log.isDebugEnabled()) {
+                                log.debug("OCR fallback invert: call #{} for ROI {} (rect=({}, {}, {}, {}))",
+                                        this.ocrCallsThisDetect + 1,
+                                        tag, r.x(), r.y(), r.width(), r.height());
+                            }
+                            byte[] b2 = new byte[(int) buf2.limit()];
+                            buf2.get(b2);
+                            BufferedImage bi2 = ImageIO.read(new ByteArrayInputStream(b2));
+                            this.ocrCallsThisDetect++;
+                            this.perfOcrCallsTotal++;
+                            final long ocrStartNs2 = System.nanoTime();
+                            raw = ocr.readBestToken(bi2).orElse(null);
+                            this.perfOcrNsTotal += (System.nanoTime() - ocrStartNs2);
+                        }
+                        buf2.deallocate();
+                        binInv.release();
+                    }
+                    if (raw == null) return null;
+                }
+                return raw.trim();
+            } catch (Exception ignore) {
+                return null;
+            } finally {
+                buf.deallocate();
+                release(k, bin, up, den, eq, gray, roi);
+            }
         } finally {
-            buf.deallocate();
-            release(k, bin, up, den, eq, gray, roi);
+            this.perfOcrRoiNsTotal += (System.nanoTime() - roiStartNs);
         }
     }
 
+    // PERF counters (PR-0)
+    private long perfOcrCallsTotal = 0;
+    private long perfOcrNsTotal = 0;
+    private long perfOcrRoiNsTotal = 0;
+    private long perfRoiAttemptsTotal = 0;
+    private long perfRoiDroppedFast = 0;
+    private long perfSnapReads = 0;
     private static int clamp(int v, int lo, int hi){ return Math.max(lo, Math.min(hi, v)); }
 
     // Управление: включать ли регион в результат нормализации, default=false
