@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 
@@ -137,6 +138,7 @@ public final class BucketDetector {
         this.perfRoiAttemptsTotal = 0;
         this.perfRoiDroppedFast = 0;
         this.perfSnapReads = 0;
+        this.perfStopByNormVotes = 0;
         final boolean ocrEnabled = Boolean.getBoolean("qv.ocr.init");
         final OcrService ocr = ocrEnabled ? new OcrService(
                 new OcrService.Config(
@@ -355,7 +357,7 @@ public final class BucketDetector {
                         OCR_FAST_MODE ? 80 : Integer.MAX_VALUE);
                 final String eventOffsetsSec = System.getProperty("qv.ocr.eventOffsetsSec", "0,-4,4");
 
-                log.info("PERF {{video='{}', totalMs={}, openMs{}, loopMs{}, fps={}, frames={}, events={}, ocrEnabled={}, snapReads={}, roiAttempts={}, roiDroppedFast={}, ocrCalls={}, ocrRoiMs={}, ocrMs={}, ocrAvgMs={}, stepFrames={}, maxRoiPerScan={}, eventOffsetsSec='{}'}}",
+                log.info("PERF {{video='{}', totalMs={}, openMs={}, loopMs={}, fps={}, frames={}, events={}, ocrEnabled={}, snapReads={}, roiAttempts={}, roiDroppedFast={}, ocrCalls={}, ocrRoiMs={}, ocrMs={}, ocrAvgMs={}, ocrStopByVotes={}, stepFrames={}, maxRoiPerScan={}, eventOffsetsSec='{}'}}",
                         videoPath.getFileName(),
                         totalMs, openMs, loopMs,
                         fps, frameCount, mergedTimes.size(),
@@ -367,6 +369,7 @@ public final class BucketDetector {
                         ocrRoiMs,
                         ocrMs,
                         ocrAvgMs,
+                        this.perfStopByNormVotes,
                         stepFrames,
                         maxRoiPerScan,
                         eventOffsetsSec);
@@ -507,6 +510,12 @@ public final class BucketDetector {
         String best = null;
         int bestScore = -1;
         int roiIdx = 0;
+        // Early-stop: если один и тот же нормализованный номер встретился N раз,
+        // прекращаем сканирование ROI.
+        // Управление:
+        // -Dqv.ocr.stopVotes=2   (рекомендуется для FAST)
+        final int stopVotes = Integer.getInteger("qv.ocr.stopVotes", OCR_FAST_MODE ? 2 : Integer.MAX_VALUE);
+        final HashMap<String, Integer> normVotes = new HashMap<>();
         if (log.isDebugEnabled()) {
             log.debug("OCR: scanning plate ROI, maxRoiPerScan={}, grid sizes: fx={}, fw={}, fy={}, fh={}",
                     (OCR_FAST_MODE ? 80 : Integer.MAX_VALUE),
@@ -541,6 +550,17 @@ public final class BucketDetector {
                         // Не выбрасываем кириллицу — оставляем A-Z, 0-9 и А-ЯЁ, как в OcrService
                         String cleaned = got.toUpperCase().replaceAll("[^A-Z0-9А-ЯЁ]", "");
                         String norm = normalizePlate(cleaned);
+                        // Голосование по нормализованному номеру: если повторился N раз — early stop
+                        if (norm != null && stopVotes != Integer.MAX_VALUE) {
+                            int v = normVotes.merge(norm, 1, Integer::sum);
+                            if (v >= stopVotes) {
+                                this.perfStopByNormVotes++;
+                                if (log.isDebugEnabled()) {
+                                    log.debug("OCR: early-stop by normVotes={} for norm='{}'", v, norm);
+                                }
+                                return norm;
+                            }
+                        }
                         // Важно: score=100 слишком "плоский" — любой валидный шаблон (включая ложный RU)
                         // мгновенно обрывает сканирование. Поэтому:
                         // 1) даём валидным номерам базу 100 + длина (8-символьный выигрывает у 6-символьного)
@@ -768,6 +788,7 @@ public final class BucketDetector {
     private long perfRoiAttemptsTotal = 0;
     private long perfRoiDroppedFast = 0;
     private long perfSnapReads = 0;
+    private long perfStopByNormVotes = 0;
     private static int clamp(int v, int lo, int hi){ return Math.max(lo, Math.min(hi, v)); }
 
     // Управление: включать ли регион в результат нормализации, default=false
