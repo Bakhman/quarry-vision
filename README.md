@@ -161,6 +161,34 @@ exec:java -Dexec.mainClass=com.quarryvision.app.Boot
 
 ```
 
+```bash
+mvn -q -DskipTests \
+-Dqv.ocr.init=true \
+-Dqv.ocr.datapath=src/main/resources/tessdata \
+-Dqv.ocr.languages=eng+rus \
+-Dqv.ocr.minContrast=0.05 -Dqv.ocr.fillMax=0.97 -Dqv.ocr.maxRoiPerScan=120 \
+exec:java -Dexec.mainClass=com.quarryvision.app.Boot
+```
+
+```bash
+mvn -q -DskipTests \
+  -Dqv.ocr.init=true \
+  -Dqv.ocr.mode=fast \
+  -Dqv.ocr.datapath=src/main/resources/tessdata \
+  -Dqv.ocr.languages=eng+rus \
+  -Dqv.ocr.psm=7 \
+  -Dqv.ocr.minContrast=0.05 \
+  -Dqv.ocr.fillMin=0.005 \
+  -Dqv.ocr.fillMax=0.940 \
+  -Dqv.ocr.dump=true \
+  -Dqv.ocr.dumpDir=trace/ocr \
+  -Dqv.ocr.dumpMax=12 \
+  -Dqv.ocr.maxRoiPerScan=25 \
+  exec:java -Dexec.mainClass=com.quarryvision.app.Boot
+
+```
+
+
 
 
 
