@@ -150,8 +150,9 @@ public final class BucketDetector {
                 )
         ) : null;
         int effectiveMergeMs = Integer.getInteger("qv.mergeMs", this.mergeMs);
-        log.info("Detect params: stepFrames={}, diffThreshold={}, eventRatio={}, cooldownFrames={}, minChangedPixels={}, mergeMs={}, emaAlpha={}, thrLowFactor={}, minActiveMs={}, nmsWindowMs={}",
-                stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, effectiveMergeMs, emaAlpha, thrLowFactor, minActiveMs, nmsWindowMs);
+        final long maxDetectMs = Long.getLong("qv.detect.maxMs", Long.MAX_VALUE);
+        log.info("Detect params: stepFrames={}, diffThreshold={}, eventRatio={}, cooldownFrames={}, minChangedPixels={}, mergeMs={}, emaAlpha={}, thrLowFactor={}, minActiveMs={}, nmsWindowMs={}, maxDetectMs={}",
+                stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, effectiveMergeMs, emaAlpha, thrLowFactor, minActiveMs, nmsWindowMs, maxDetectMs);
         try {
             if (!java.nio.file.Files.isRegularFile(videoPath) || java.nio.file.Files.size(videoPath) == 0L) {
                 log.error("Video file invalid: exists={} size={} path={}",
@@ -254,6 +255,11 @@ public final class BucketDetector {
                     double ratio = white / (double) (diff.rows() * diff.cols());
                     ema = emaAlpha * ratio + (1.0 - emaAlpha) * ema;
                     long msNow = (long) ((idx / fps) * 1000.0);
+
+                    if (msNow >= maxDetectMs) {
+                        log.info("Detect: reached qv.detect.maxMs={}ms (msNow={}), stop early", maxDetectMs, msNow);
+                        break;
+                    }
                     String stStr = st.name();
                     int evtMark = 0;
 
