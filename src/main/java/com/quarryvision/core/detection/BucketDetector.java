@@ -397,6 +397,8 @@ public final class BucketDetector {
     private String tryOcrPlateAroundEvent(OcrService ocr, VideoCapture cap,
                                           long midFrame, double fps, long frameCount) {
         String offs = System.getProperty("qv.ocr.eventOffsetsSec", "0,-4,4");
+        // Бюджет OCR — на событие целиком (на все offsets), а не на каждый кадр отдельно
+        this.ocrCallsThisDetect = 0;
         String[] parts = offs.split(",");
         for (String p : parts) {
             int sec;
@@ -412,7 +414,13 @@ public final class BucketDetector {
                 this.perfSnapReads++;
                 snap = readFrameAt(cap, f);
                 if (snap == null || snap.empty()) continue;
-                this.ocrCallsThisDetect = 0; // бюджет OCR — на одну попытку кадра
+                // Если бюджет исчерпан — дальше offsets не читаем
+                if (this.ocrCallsThisDetect >= MAX_OCR_CALLS_PER_DETECT) {
+                    if ( log.isDebugEnabled()) {
+                        log.debug("OCR: event budget reached (MAX_OCR_CALLS_PER_DETECT={}), stop offsets scan", MAX_OCR_CALLS_PER_DETECT);
+                    }
+                    break;
+                }
                 String plate = tryOcrPlate(ocr, snap);
                 if (plate != null && !plate.isBlank()) {
                     if (log.isDebugEnabled()) {
