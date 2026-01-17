@@ -530,16 +530,17 @@ public final class BucketDetector {
         // -Dqv.ocr.stopVotes=2   (рекомендуется для FAST)
         final int stopVotes = Integer.getInteger("qv.ocr.stopVotes", OCR_FAST_MODE ? 2 : Integer.MAX_VALUE);
         final HashMap<String, Integer> normVotes = new HashMap<>();
-        if (log.isDebugEnabled()) {
-            log.debug("OCR: scanning plate ROI, maxRoiPerScan={}, grid sizes: fx={}, fw={}, fy={}, fh={}",
-                    (OCR_FAST_MODE ? 80 : Integer.MAX_VALUE),
-                    fxList.length, fwList.length, fyList.length, fhList.length);
-        }
 
-        // В fast-режиме ограничиваем кол-во ROI, чтобы не дергать OCR сотни раз
+
+        // Лимит ROI (Region of Interest, область интереса) на один скан номера.
+        // В FAST-режиме значение по умолчанию = 80, но его можно переопределить через -Dqv.ocr.maxRoiPerScan=...
         final int maxRoiPerScan = Integer.getInteger(
                 "qv.ocr.maxRoiPerScan",
                 OCR_FAST_MODE ? 80 : Integer.MAX_VALUE);
+        if (log.isDebugEnabled()) {
+            log.debug("OCR: scanning plate ROI, maxRoiPerScan={}, grid sizes: fx={}, fw={}, fy={}, fh={}",
+                    maxRoiPerScan, fxList.length, fwList.length, fyList.length, fhList.length);
+        }
 
         outer:
         for (double fx : fxList)
