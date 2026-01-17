@@ -246,6 +246,12 @@ public final class BucketDetector {
                     opencv_imgproc.erode(diff, diff, kernel);
                     opencv_imgproc.dilate(diff, diff, kernel);
                     double white = opencv_core.countNonZero(diff);
+                    long msNow = (long) ((idx / fps) * 1000.0);
+
+                    if (msNow >= maxDetectMs) {
+                        log.info("Detect: reached qv.detect.maxMs={}ms (msNow={}), stop early", maxDetectMs, msNow);
+                        break;
+                    }
                     // Отсечь мелкие всплески
                     if (white < minChangedPixels) {
                         gray.copyTo(grayPrev);
@@ -254,12 +260,6 @@ public final class BucketDetector {
                     }
                     double ratio = white / (double) (diff.rows() * diff.cols());
                     ema = emaAlpha * ratio + (1.0 - emaAlpha) * ema;
-                    long msNow = (long) ((idx / fps) * 1000.0);
-
-                    if (msNow >= maxDetectMs) {
-                        log.info("Detect: reached qv.detect.maxMs={}ms (msNow={}), stop early", maxDetectMs, msNow);
-                        break;
-                    }
                     String stStr = st.name();
                     int evtMark = 0;
 
