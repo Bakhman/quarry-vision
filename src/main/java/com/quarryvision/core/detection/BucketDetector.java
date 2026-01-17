@@ -279,7 +279,8 @@ public final class BucketDetector {
                                 if (durFrames >= minActiveFrames) {
                                     // Границы события
                                     long startFrame = activeStartFrame;
-                                    long endFrame = idx;
+                                    // idx здесь уже первый кадр после того, как EMA упал ниже thrLow
+                                    long endFrame = Math.max(startFrame, idx - 1);
                                     long startMs = (long) ((startFrame / fps) * 1000.0);
                                     long endMs = (long) ((endFrame / fps) * 1000.0);
 
