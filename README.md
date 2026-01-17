@@ -188,6 +188,23 @@ mvn -q -DskipTests \
 
 ```
 
+```bash
+mvn -q -DskipTests \
+-Dqv.detect.warmupMs=15000 \
+-Dqv.detect.maxMs=20000 \
+-Dqv.ocr.init=true \
+-Dqv.ocr.datapath=src/main/resources/tessdata \
+-Dqv.ocr.languages=eng+rus \
+-Dqv.ocr.minContrast=0.05 \
+-Dqv.ocr.fillMax=0.97 \
+-Dqv.ocr.eventOffsetsSec=0,-4,4 \
+-Dqv.ocr.maxRoiPerScan=100 \
+-Dqv.ocr.stopVotes=2 \
+exec:java -Dexec.mainClass=com.quarryvision.app.Boot
+
+```
+
+
 
 
 

@@ -151,8 +151,11 @@ public final class BucketDetector {
         ) : null;
         int effectiveMergeMs = Integer.getInteger("qv.mergeMs", this.mergeMs);
         final long maxDetectMs = Long.getLong("qv.detect.maxMs", Long.MAX_VALUE);
-        log.info("Detect params: stepFrames={}, diffThreshold={}, eventRatio={}, cooldownFrames={}, minChangedPixels={}, mergeMs={}, emaAlpha={}, thrLowFactor={}, minActiveMs={}, nmsWindowMs={}, maxDetectMs={}",
-                stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, effectiveMergeMs, emaAlpha, thrLowFactor, minActiveMs, nmsWindowMs, maxDetectMs);
+        // Warm-up окно в миллисекундах: события, которые попали целиком в первые N мс, игнорируем как шум.
+        // Пример: -Dqv.detect.warmupMs=15000
+        final long warmupMs = Long.getLong("qv.detect.warmupMs", 0L);
+        log.info("Detect params: stepFrames={}, diffThreshold={}, eventRatio={}, cooldownFrames={}, minChangedPixels={}, mergeMs={}, emaAlpha={}, thrLowFactor={}, minActiveMs={}, nmsWindowMs={}, maxDetectMs={}, warmupMs={}",
+                stepFrames, diffThreshold, eventRatio, cooldownFrames, minChangedPixels, effectiveMergeMs, emaAlpha, thrLowFactor, minActiveMs, nmsWindowMs, maxDetectMs, warmupMs);
         try {
             if (!java.nio.file.Files.isRegularFile(videoPath) || java.nio.file.Files.size(videoPath) == 0L) {
                 log.error("Video file invalid: exists={} size={} path={}",
@@ -276,27 +279,35 @@ public final class BucketDetector {
                                 if (durFrames >= minActiveFrames) {
                                     long mid = activeStartFrame + durFrames / 2;
                                     long ms = (long) ((mid / fps) * 1000.0);
-
-                                    String plate = null;
-                                    // OCR-хук: один снимок в середине события
-                                    if (ocr != null) {
-                                        try {
-                                            plate = tryOcrPlateAroundEvent(ocr, cap, mid, fps, frameCount);
-                                            if (plate != null && !plate.isBlank()) {
-                                                log.info("OCR plate@{}ms: {}", ms, plate);
-                                            } else {
-                                                log.debug("OCR no plate @{}ms", ms);
-                                            }
-                                        } catch (Throwable t) {
-                                            log.debug("OCR hook failed: {}", t.toString());
+                                    // Warm-up фильтр: стартовый шум камеры часто выглядит как "событие".
+                                    // Такие события не считаем реальными и не дергаем OCR.
+                                    if (warmupMs > 0 && ms < warmupMs) {
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("Detect: drop warmup event @{}ms (<{}ms)", ms, warmupMs);
                                         }
+                                        lastEventFrame = idx; // чтобы отработал cooldown и не было "дребезга"
+                                    } else {
+                                        String plate = null;
+                                        // OCR-хук: один снимок в середине события
+                                        if (ocr != null) {
+                                            try {
+                                                plate = tryOcrPlateAroundEvent(ocr, cap, mid, fps, frameCount);
+                                                if (plate != null && !plate.isBlank()) {
+                                                    log.info("OCR plate@{}ms: {}", ms, plate);
+                                                } else {
+                                                    log.debug("OCR no plate @{}ms", ms);
+                                                }
+                                            } catch (Throwable t) {
+                                                log.debug("OCR hook failed: {}", t.toString());
+                                            }
+                                        }
+
+                                        stamps.add(Instant.ofEpochMilli(ms));
+                                        ocrPlates.add(plate);
+
+                                        lastEventFrame = idx;
+                                        evtMark = 1;
                                     }
-
-                                    stamps.add(Instant.ofEpochMilli(ms));
-                                    ocrPlates.add(plate);
-
-                                    lastEventFrame = idx;
-                                    evtMark = 1;
                                 }
                                 st = S.IDLE;
                                 stStr = st.name();
@@ -363,7 +374,7 @@ public final class BucketDetector {
                         OCR_FAST_MODE ? 80 : Integer.MAX_VALUE);
                 final String eventOffsetsSec = System.getProperty("qv.ocr.eventOffsetsSec", "0,-4,4");
 
-                log.info("PERF {{video='{}', totalMs={}, openMs={}, loopMs={}, fps={}, frames={}, events={}, ocrEnabled={}, snapReads={}, roiAttempts={}, roiDroppedFast={}, ocrCalls={}, ocrRoiMs={}, ocrMs={}, ocrAvgMs={}, ocrStopByVotes={}, stepFrames={}, maxRoiPerScan={}, eventOffsetsSec='{}'}}",
+                log.info("PERF {{video='{}', totalMs={}, openMs={}, loopMs={}, fps={}, frames={}, events={}, ocrEnabled={}, snapReads={}, roiAttempts={}, roiDroppedFast={}, ocrCalls={}, ocrRoiMs={}, ocrMs={}, ocrAvgMs={}, ocrStopByVotes={}, stepFrames={}, maxRoiPerScan={}, warmupMs={}, eventOffsetsSec='{}'}}",
                         videoPath.getFileName(),
                         totalMs, openMs, loopMs,
                         fps, frameCount, mergedTimes.size(),
@@ -378,6 +389,7 @@ public final class BucketDetector {
                         this.perfStopByNormVotes,
                         stepFrames,
                         maxRoiPerScan,
+                        warmupMs,
                         eventOffsetsSec);
                 return out;
             } finally {
