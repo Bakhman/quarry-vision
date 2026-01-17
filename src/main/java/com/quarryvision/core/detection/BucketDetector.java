@@ -277,18 +277,26 @@ public final class BucketDetector {
                             if (ema < thrLow) {
                                 long durFrames = idx - activeStartFrame;
                                 if (durFrames >= minActiveFrames) {
-                                    long mid = activeStartFrame + durFrames / 2;
-                                    long ms = (long) ((mid / fps) * 1000.0);
-                                    // Warm-up фильтр: стартовый шум камеры часто выглядит как "событие".
-                                    // Такие события не считаем реальными и не дергаем OCR.
-                                    if (warmupMs > 0 && ms < warmupMs) {
+                                    // Границы события
+                                    long startFrame = activeStartFrame;
+                                    long endFrame = idx;
+                                    long startMs = (long) ((startFrame / fps) * 1000.0);
+                                    long endMs = (long) ((endFrame / fps) * 1000.0);
+
+                                    // Warmup: отбрасываем только события, которые ЦЕЛИКОМ в первые warmupMs
+                                    // (по midpoint нельзя — можно потерять реальное событие, пересекающее границу warmup)
+                                    if (warmupMs > 0 && endMs <= warmupMs) {
                                         if (log.isDebugEnabled()) {
-                                            log.debug("Detect: drop warmup event @{}ms (<{}ms)", ms, warmupMs);
+                                            log.debug("Detect: drop warmup event (startMs={}, endMs={}, warmupMs={})",
+                                                    startMs, endMs, warmupMs);
                                         }
-                                        lastEventFrame = idx; // чтобы отработал cooldown и не было "дребезга"
+                                        // Важно: не дергаем OCR и не добавляем событие
                                     } else {
+                                        long mid = startFrame + durFrames / 2;
+                                        long ms = (long) ((mid / fps) * 1000.0);
+
                                         String plate = null;
-                                        // OCR-хук: один снимок в середине события
+                                        // OCR-хук: снимки вокруг события
                                         if (ocr != null) {
                                             try {
                                                 plate = tryOcrPlateAroundEvent(ocr, cap, mid, fps, frameCount);
