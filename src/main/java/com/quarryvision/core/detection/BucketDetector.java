@@ -566,14 +566,20 @@ public final class BucketDetector {
                         String cleaned = got.toUpperCase().replaceAll("[^A-Z0-9А-ЯЁ]", "");
                         String norm = normalizePlate(cleaned);
                         // Голосование по нормализованному номеру: если повторился N раз — early stop
+                        // но только для "достаточно длинных" номеров, чтобы не залипать на коротких ложняках.
                         if (norm != null && stopVotes != Integer.MAX_VALUE) {
                             int v = normVotes.merge(norm, 1, Integer::sum);
-                            if (v >= stopVotes) {
+                            final int minLenForEarlyStop = Integer.getInteger("qv.ocr.stopVotesMinLen", 8);
+                            if (v >= stopVotes && norm.length() >= minLenForEarlyStop) {
                                 this.perfStopByNormVotes++;
                                 if (log.isDebugEnabled()) {
-                                    log.debug("OCR: early-stop by normVotes={} for norm='{}'", v, norm);
+                                    log.debug("OCR: early-stop by normVotes={} for norm='{}' (len>={})",
+                                            v, norm, minLenForEarlyStop);
                                 }
                                 return norm;
+                            } else if (v >= stopVotes && log.isDebugEnabled()) {
+                                log.debug("OCR: votes reached (v={}) but skip early-stop: norm='{}' len={} < {}",
+                                        v, norm, norm.length(), minLenForEarlyStop);
                             }
                         }
                         // Важно: score=100 слишком "плоский" — любой валидный шаблон (включая ложный RU)
