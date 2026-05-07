@@ -9,7 +9,7 @@
 
 1. Обнови `main`:
    ```sh
-   git checkout main && git pull
+   git switch main && git pull
    ```
 
 2. Создай новую ветку:
@@ -47,7 +47,7 @@
 7. После merge:
 
    ```sh
-   git checkout main && git pull
+   git switch main && git pull
    git branch -d <branch>
    ```
    
