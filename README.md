@@ -25,6 +25,32 @@
 
 Счётчик ковшей/рейсов для карьера + трекинг погрузки/разгрузки. Java 17, JavaFX, Maven, SnakeYAML, PostgreSQL.
 
+## Project status
+
+MVP exists and has been developed and tested on publicly available / YouTube video footage.
+
+Current status: **blocked / waiting for customer input**.
+
+Further production validation and detection tuning are blocked until real customer footage is available from the target environment. The cameras have not yet been installed on the excavators, and the customer has not yet provided real camera recordings.
+
+Continuing to tune detection thresholds on non-representative public videos is not considered useful at this stage, because such videos cannot reliably validate:
+
+- production accuracy;
+- detection thresholds;
+- false positives / false negatives;
+- readiness of the algorithm for real operating conditions.
+
+To continue production validation, the project needs the following customer input:
+
+- 3–5 real video recordings from cameras installed in their intended working positions;
+- approximately 10–30 minutes per recording;
+- different real operating conditions where applicable: dust, low visibility, pauses, manoeuvres, empty bucket;
+- resolution, FPS and a short description of each camera position;
+- ground truth for each video: actual number of bucket-loading events / loading events.
+
+Проект остановлен не из-за кода, а из-за отсутствия реального входного материала от клиента.
+Следующий технически осмысленный шаг возможен только после получения видео с камер.
+
 ## Требования
 - JDK 17 (Temurin)
 - Maven 3.9+
